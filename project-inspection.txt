@@ -1,0 +1,1364 @@
+﻿========== PROJECT FILES ==========
+
+--- FILE LIST: app ---
+app\globals.css
+app\layout.tsx
+app\middleware.ts
+app\page.tsx
+app\api\auth\login\route.ts
+app\api\auth\logout\route.ts
+app\api\customers\search\route.ts
+app\customers\page.tsx
+app\customers\[id]\page.tsx
+app\dashboard\page.tsx
+app\db-test\page.tsx
+app\departments\page.tsx
+app\execution\[id]\page.tsx
+app\login\page.tsx
+app\reports\page.tsx
+app\requests\page.tsx
+app\requests\[id]\page.tsx
+app\settings\page.tsx
+app\tasks\page.tsx
+app\unauthorized\page.tsx
+app\users\page.tsx
+app\workflow\[screen]\page.tsx
+
+--- FILE LIST: components ---
+components\Header.tsx
+components\ProtectedPage.tsx
+components\RequestRegistration.tsx
+components\Sidebar.tsx
+components\TaskTable.tsx
+
+--- FILE LIST: lib ---
+lib\auth.ts
+lib\permissions.ts
+lib\prisma.ts
+
+--- FILE LIST: prisma ---
+prisma\check-services.ts
+prisma\check.ts
+prisma\schema.prisma
+prisma\seed-services.ts
+prisma\seed.ts
+
+
+========== prisma/schema.prisma ==========
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ==========================================
+// Ø§Ù„Ø£Ù‚Ø³Ø§Ù…
+// ==========================================
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  users              User[]
+  requests           Request[]           @relation("CurrentDepartment")
+  tasks              WorkflowTask[]
+  taskTypes          TaskType[]
+  procedureTemplates ProcedureTemplate[]
+  incomingTransfers  RequestTransfer[]   @relation("ToDepartment")
+  outgoingTransfers  RequestTransfer[]   @relation("FromDepartment")
+}
+
+// ==========================================
+// Ø§Ù„Ù…ÙˆØ¸ÙÙˆÙ† ÙˆØ§Ù„Ù…Ø¯ÙŠØ±ÙˆÙ†
+// ==========================================
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String
+  departmentId String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  department      Department?       @relation(fields: [departmentId], references: [id])
+  createdRequests Request[]         @relation("RequestCreator")
+  assignedTasks   WorkflowTask[]    @relation("TaskAssignee")
+  createdTasks    WorkflowTask[]    @relation("TaskAssigner")
+  transfers       RequestTransfer[]
+  activities      ActivityLog[]
+  expenses        Expense[]
+  notifications   Notification[]
+}
+
+// ==========================================
+// Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡
+// ==========================================
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  taxNumber String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents CustomerDocument[]
+  requests  Request[]
+}
+
+// ==========================================
+// Ù…Ø³ØªÙ†Ø¯Ø§Øª ÙˆØ¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„
+// ==========================================
+
+model CustomerDocument {
+  id             String    @id @default(cuid())
+  customerId     String
+  documentType   String
+  documentNumber String?
+  issueDate      DateTime?
+  expiryDate     DateTime?
+  filePath       String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Ø§Ù„Ø·Ù„Ø¨Ø§Øª
+// ==========================================
+
+model Request {
+  id                  String  @id @default(cuid())
+  requestNumber       String  @unique
+  customerId          String
+  createdById         String
+  currentDepartmentId String?
+
+  // Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø®Ø¯Ù…Ø©
+  serviceName      String
+  serviceId        String?
+  serviceVariantId String?
+
+  description String?
+  priority    String    @default("NORMAL")
+  status      String    @default("NEW")
+  receivedAt  DateTime  @default(now())
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  customer          Customer    @relation(fields: [customerId], references: [id])
+  createdBy         User        @relation("RequestCreator", fields: [createdById], references: [id])
+  currentDepartment Department? @relation("CurrentDepartment", fields: [currentDepartmentId], references: [id])
+
+  // Ø¹Ù„Ø§Ù‚Ø§Øª Ø§Ù„Ø®Ø¯Ù…Ø©
+  service        Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  serviceVariant ServiceVariant? @relation(fields: [serviceVariantId], references: [id], onDelete: SetNull)
+
+  // Ø¹Ù„Ø§Ù‚Ø§Øª Ø§Ù„Ø·Ù„Ø¨
+  attachments          RequestAttachment[]
+  tasks                WorkflowTask[]
+  transfers            RequestTransfer[]
+  activities           ActivityLog[]
+  expenses             Expense[]
+  documentRequirements RequestDocumentRequirement[]
+
+  @@index([serviceId])
+  @@index([serviceVariantId])
+  @@index([customerId])
+  @@index([requestNumber])
+}
+
+// ==========================================
+// Ù…Ø±ÙÙ‚Ø§Øª Ø§Ù„Ø·Ù„Ø¨
+// ==========================================
+
+model RequestAttachment {
+  id        String   @id @default(cuid())
+  requestId String
+  fileName  String
+  filePath  String
+  createdAt DateTime @default(now())
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Ø³Ø¬Ù„ ØªØ­ÙˆÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨Ø§Øª Ø¨ÙŠÙ† Ø§Ù„Ø£Ù‚Ø³Ø§Ù…
+// ==========================================
+
+model RequestTransfer {
+  id               String   @id @default(cuid())
+  requestId        String
+  fromDepartmentId String?
+  toDepartmentId   String
+  transferredById  String
+  notes            String?
+  transferredAt    DateTime @default(now())
+
+  request        Request     @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fromDepartment Department? @relation("FromDepartment", fields: [fromDepartmentId], references: [id])
+  toDepartment   Department  @relation("ToDepartment", fields: [toDepartmentId], references: [id])
+  transferredBy  User        @relation(fields: [transferredById], references: [id])
+}
+
+// ==========================================
+// Ø£Ù†ÙˆØ§Ø¹ Ø§Ù„Ù…Ù‡Ø§Ù…
+// ==========================================
+
+model TaskType {
+  id                  String  @id @default(cuid())
+  name                String
+  departmentId        String
+  procedureTemplateId String?
+  isActive            Boolean @default(true)
+
+  department        Department         @relation(fields: [departmentId], references: [id])
+  procedureTemplate ProcedureTemplate? @relation(fields: [procedureTemplateId], references: [id])
+  tasks             WorkflowTask[]
+
+  @@unique([name, departmentId])
+}
+
+// ==========================================
+// Ù‚ÙˆØ§Ù„Ø¨ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª ÙˆØ®Ø·ÙˆØ§ØªÙ‡Ø§
+// ==========================================
+
+model ProcedureTemplate {
+  id           String  @id @default(cuid())
+  name         String
+  departmentId String
+  description  String?
+  isActive     Boolean @default(true)
+
+  department Department              @relation(fields: [departmentId], references: [id])
+  steps      ProcedureStepTemplate[]
+  taskTypes  TaskType[]
+  tasks      WorkflowTask[]
+}
+
+model ProcedureStepTemplate {
+  id                  String  @id @default(cuid())
+  procedureTemplateId String
+  title               String
+  description         String?
+  order               Int
+
+  procedureTemplate ProcedureTemplate @relation(fields: [procedureTemplateId], references: [id], onDelete: Cascade)
+  taskSteps         TaskStep[]
+}
+
+// ==========================================
+// Ø§Ù„Ù…Ù‡Ø§Ù… Ø§Ù„Ù…ÙˆØ²Ø¹Ø© Ø¹Ù„Ù‰ Ø§Ù„Ù…ÙˆØ¸ÙÙŠÙ†
+// ==========================================
+
+model WorkflowTask {
+  id                  String    @id @default(cuid())
+  requestId           String
+  departmentId        String
+  taskTypeId          String
+  procedureTemplateId String?
+  assignedToId        String?
+  assignedById        String
+  title               String
+  instructions        String?
+  status              String    @default("PENDING")
+  startedAt           DateTime?
+  expectedEndAt       DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  request           Request            @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  department        Department         @relation(fields: [departmentId], references: [id])
+  taskType          TaskType           @relation(fields: [taskTypeId], references: [id])
+  procedureTemplate ProcedureTemplate? @relation(fields: [procedureTemplateId], references: [id])
+  assignedTo        User?              @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  assignedBy        User               @relation("TaskAssigner", fields: [assignedById], references: [id])
+
+  steps       TaskStep[]
+  attachments TaskAttachment[]
+  expenses    Expense[]
+  activities  ActivityLog[]
+}
+
+// ==========================================
+// Ø®Ø·ÙˆØ§Øª ØªÙ†ÙÙŠØ° Ø§Ù„Ù…Ù‡Ù…Ø©
+// ==========================================
+
+model TaskStep {
+  id             String    @id @default(cuid())
+  taskId         String
+  templateStepId String?
+  title          String
+  notes          String?
+  status         String    @default("PENDING")
+  completedAt    DateTime?
+  order          Int
+
+  task         WorkflowTask           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  templateStep ProcedureStepTemplate? @relation(fields: [templateStepId], references: [id])
+}
+
+// ==========================================
+// Ù…Ø±ÙÙ‚Ø§Øª ØªÙ†ÙÙŠØ° Ø§Ù„Ù…Ù‡Ù…Ø©
+// ==========================================
+
+model TaskAttachment {
+  id        String   @id @default(cuid())
+  taskId    String
+  fileName  String
+  filePath  String
+  createdAt DateTime @default(now())
+
+  task WorkflowTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª
+// ==========================================
+
+model Expense {
+  id          String   @id @default(cuid())
+  requestId   String
+  taskId      String?
+  employeeId  String
+  amount      Float
+  description String
+  createdAt   DateTime @default(now())
+
+  request  Request       @relation(fields: [requestId], references: [id])
+  task     WorkflowTask? @relation(fields: [taskId], references: [id])
+  employee User          @relation(fields: [employeeId], references: [id])
+}
+
+// ==========================================
+// Ø³Ø¬Ù„ Ø§Ù„Ø£Ø­Ø¯Ø§Ø« ÙˆØ§Ù„ØªØ¹Ø¯ÙŠÙ„Ø§Øª
+// ==========================================
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  requestId String?
+  taskId    String?
+  userId    String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  request Request?      @relation(fields: [requestId], references: [id])
+  task    WorkflowTask? @relation(fields: [taskId], references: [id])
+  user    User          @relation(fields: [userId], references: [id])
+}
+
+// ==========================================
+// Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª
+// ==========================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Ø¯Ù„ÙŠÙ„ Ø®Ø¯Ù…Ø§Øª GAFI
+// ==========================================
+
+// ØªØµÙ†ÙŠÙØ§Øª Ø§Ù„Ø®Ø¯Ù…Ø§Øª
+model ServiceCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  services Service[]
+}
+
+// Ø§Ù„Ø®Ø¯Ù…Ø§Øª
+model Service {
+  id          String   @id @default(cuid())
+  categoryId  String
+  name        String
+  slug        String   @unique
+  description String?
+  sourceName  String?
+  sourcePage  Int?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category             ServiceCategory              @relation(fields: [categoryId], references: [id])
+  variants             ServiceVariant[]
+  documentRequirements ServiceDocumentRequirement[]
+  requests             Request[]
+
+  @@index([categoryId])
+}
+
+// Ø£Ù†ÙˆØ§Ø¹ Ø£Ùˆ Ø£Ø´ÙƒØ§Ù„ Ø§Ù„Ø®Ø¯Ù…Ø©
+model ServiceVariant {
+  id          String   @id @default(cuid())
+  serviceId   String
+  name        String
+  slug        String
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  documentRequirements ServiceDocumentRequirement[]
+  requests             Request[]
+
+  @@unique([serviceId, slug])
+  @@index([serviceId])
+}
+
+// Ø§Ù„Ù…Ø³ØªÙ†Ø¯Ø§Øª Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø© Ù„ÙƒÙ„ Ø®Ø¯Ù…Ø© Ø£Ùˆ Ù†ÙˆØ¹ Ø®Ø¯Ù…Ø©
+model ServiceDocumentRequirement {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  serviceId  String
+  variantId  String?
+  title      String
+  details    String?
+  condition  String?
+  isRequired Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  sourcePage Int?
+  sourceNote String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  service Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  variant ServiceVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  requestRequirements RequestDocumentRequirement[]
+
+  @@index([serviceId])
+  @@index([variantId])
+}
+
+// Ù†Ø³Ø®Ø© Ù…Ø³ØªÙ‚Ù„Ø© Ù…Ù† Ù…ØªØ·Ù„Ø¨Ø§Øª Ø§Ù„Ù…Ø³ØªÙ†Ø¯Ø§Øª Ù„ÙƒÙ„ Ø·Ù„Ø¨
+model RequestDocumentRequirement {
+  id              String    @id @default(cuid())
+  requestId       String
+  requirementId   String?
+  requirementCode String?
+  title           String
+  details         String?
+  condition       String?
+  isRequired      Boolean   @default(true)
+  status          String    @default("NOT_RECEIVED")
+  notes           String?
+  filePath        String?
+  receivedAt      DateTime?
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  requirement ServiceDocumentRequirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([requirementId])
+}
+
+
+
+========== lib/prisma.ts ==========
+
+import "dotenv/config";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaClient } from "../generated/prisma/client";
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not defined in .env");
+}
+
+const adapter = new PrismaBetterSqlite3({
+  url: connectionString,
+});
+
+const prisma = new PrismaClient({
+  adapter,
+});
+
+export { prisma };
+
+
+
+========== lib/auth.ts ==========
+
+import "server-only";
+import { SignJWT, jwtVerify } from "jose";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { prisma } from "./prisma";
+
+const COOKIE_NAME = "masar_session";
+const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
+
+if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 32) {
+  throw new Error("AUTH_SECRET must be at least 32 characters");
+}
+
+type SessionUser = {
+  id: string;
+  role: string;
+  departmentId: string | null;
+};
+
+export async function createSession(user: SessionUser) {
+  const token = await new SignJWT({
+    role: user.role,
+    departmentId: user.departmentId,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(user.id)
+    .setIssuedAt()
+    .setExpirationTime("8h")
+    .sign(secret);
+
+  const cookieStore = await cookies();
+
+  cookieStore.set(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 8,
+  });
+}
+
+export async function deleteSession() {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAME);
+}
+
+export async function getCurrentUser() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+
+  if (!token) return null;
+
+  try {
+    const { payload } = await jwtVerify(token, secret);
+
+    if (!payload.sub) return null;
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        departmentId: true,
+        isActive: true,
+        department: {
+          select: { name: true },
+        },
+      },
+    });
+
+    if (!user || !user.isActive) return null;
+
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+export async function requireUser() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  return user;
+}
+
+
+
+========== lib/permissions.ts ==========
+
+import "server-only";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "./auth";
+
+export const ROLES = {
+  GENERAL_MANAGER: "GENERAL_MANAGER",
+  DEPARTMENT_MANAGER: "DEPARTMENT_MANAGER",
+  EMPLOYEE: "EMPLOYEE",
+} as const;
+
+export async function requireRole(allowedRoles: string[]) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (!allowedRoles.includes(user.role)) {
+    redirect("/unauthorized");
+  }
+
+  return user;
+}
+
+export async function requireGeneralManager() {
+  return requireRole([ROLES.GENERAL_MANAGER]);
+}
+
+export async function requireDepartmentManager() {
+  return requireRole([
+    ROLES.GENERAL_MANAGER,
+    ROLES.DEPARTMENT_MANAGER,
+  ]);
+}
+
+export async function requireEmployee() {
+  return requireRole([
+    ROLES.GENERAL_MANAGER,
+    ROLES.DEPARTMENT_MANAGER,
+    ROLES.EMPLOYEE,
+  ]);
+}
+
+export async function canAccessDepartment(departmentId: string) {
+  const user = await getCurrentUser();
+
+  if (!user) return false;
+
+  if (user.role === ROLES.GENERAL_MANAGER) return true;
+
+  return user.departmentId === departmentId;
+}
+
+
+
+========== app/layout.tsx ==========
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Ù†Ø¸Ø§Ù… Ù…ØªØ§Ø¨Ø¹Ø© Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª",
+  description: "Khater El-Louaj Workflow Management",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="ar" dir="rtl">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+
+========== app/workflow/[screen]/page.tsx ==========
+FILE NOT FOUND
+
+
+========== app/login/page.tsx ==========
+
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+export default function LoginPage() {
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || "تعذر تسجيل الدخول");
+        return;
+      }
+
+      router.replace("/");
+      router.refresh();
+    } catch {
+      setError("تعذر الاتصال بالخادم. حاول مرة أخرى.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main
+      dir="rtl"
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#f3f5f9",
+        padding: "24px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+          background: "#fff",
+          padding: "36px",
+          borderRadius: "16px",
+          boxShadow: "0 8px 35px rgba(0,0,0,0.08)",
+        }}
+      >
+        <div style={{ textAlign: "center", marginBottom: "30px" }}>
+          <h1 style={{ color: "#183153", marginBottom: "10px" }}>
+            خاطر اللواج
+          </h1>
+
+          <p style={{ color: "#64748b", margin: 0 }}>
+            تسجيل الدخول إلى نظام إدارة الطلبات
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <label
+            htmlFor="email"
+            style={{ display: "block", marginBottom: "8px" }}
+          >
+            البريد الإلكتروني
+          </label>
+
+          <input
+            id="email"
+            type="email"
+            required
+            autoComplete="username"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="أدخل البريد الإلكتروني"
+            style={{
+              width: "100%",
+              padding: "13px",
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              marginBottom: "20px",
+              boxSizing: "border-box",
+            }}
+          />
+
+          <label
+            htmlFor="password"
+            style={{ display: "block", marginBottom: "8px" }}
+          >
+            كلمة المرور
+          </label>
+
+          <input
+            id="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="أدخل كلمة المرور"
+            style={{
+              width: "100%",
+              padding: "13px",
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              marginBottom: "18px",
+              boxSizing: "border-box",
+            }}
+          />
+
+          {error && (
+            <p
+              role="alert"
+              style={{
+                color: "#b91c1c",
+                background: "#fef2f2",
+                padding: "10px",
+                borderRadius: "8px",
+                fontSize: "14px",
+              }}
+            >
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: "100%",
+              padding: "14px",
+              border: "none",
+              borderRadius: "8px",
+              background: loading ? "#64748b" : "#183153",
+              color: "#fff",
+              fontSize: "16px",
+              cursor: loading ? "wait" : "pointer",
+            }}
+          >
+            {loading ? "جاري تسجيل الدخول..." : "تسجيل الدخول"}
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
+
+
+
+========== app/api/auth/login/route.ts ==========
+
+import { NextResponse } from "next/server";
+import { compare } from "bcryptjs";
+import { prisma } from "@/lib/prisma";
+import { createSession } from "@/lib/auth";
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+
+    const email =
+      typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+
+    const password =
+      typeof body.password === "string" ? body.password : "";
+
+    if (!email || !password) {
+      return NextResponse.json(
+        { message: "Ø£Ø¯Ø®Ù„ Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ ÙˆÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±" },
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user || !user.isActive) {
+      return NextResponse.json(
+        { message: "Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„ ØºÙŠØ± ØµØ­ÙŠØ­Ø©" },
+        { status: 401 }
+      );
+    }
+
+    const passwordIsValid = await compare(
+      password,
+      user.passwordHash
+    );
+
+    if (!passwordIsValid) {
+      return NextResponse.json(
+        { message: "Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„ ØºÙŠØ± ØµØ­ÙŠØ­Ø©" },
+        { status: 401 }
+      );
+    }
+
+    await createSession({
+      id: user.id,
+      role: user.role,
+      departmentId: user.departmentId,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¨Ù†Ø¬Ø§Ø­",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        departmentId: user.departmentId,
+      },
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+
+    return NextResponse.json(
+      { message: "Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„" },
+      { status: 500 }
+    );
+  }
+}
+
+
+
+========== app/api/auth/logout/route.ts ==========
+
+import { NextResponse } from "next/server";
+import { deleteSession } from "@/lib/auth";
+
+export async function POST() {
+  await deleteSession();
+
+  return NextResponse.json({
+    success: true,
+    message: "ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬",
+  });
+}
+
+
+
+========== components/RequestRegistration.tsx ==========
+
+"use client";
+
+import { useState } from "react";
+
+type CustomerDocument = {
+  id: string;
+  documentType: string;
+  documentNumber: string | null;
+  issueDate: string | null;
+  expiryDate: string | null;
+  filePath: string | null;
+  notes: string | null;
+};
+
+type Customer = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  taxNumber: string | null;
+  notes: string | null;
+  documents: CustomerDocument[];
+};
+
+const documentTypes = [
+  "Ø§Ù„Ø¨Ø·Ø§Ù‚Ø© Ø§Ù„Ø¶Ø±ÙŠØ¨ÙŠØ©",
+  "Ø´Ù‡Ø§Ø¯Ø© Ø§Ù„ØªØ³Ø¬ÙŠÙ„ ÙÙŠ Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù‚ÙŠÙ…Ø© Ø§Ù„Ù…Ø¶Ø§ÙØ©",
+  "Ø³Ø¬Ù„ ØªØ¬Ø§Ø±ÙŠ",
+  "Ø¨Ø·Ø§Ù‚Ø© Ø§Ø³ØªÙŠØ±Ø§Ø¯ÙŠØ©",
+  "Ø¨Ø·Ø§Ù‚Ø© ØªØµØ¯ÙŠØ±ÙŠØ©",
+  "Ø±Ø®ØµØ© Ø¥Ù†Ø´Ø§Ø¡Ø§Øª",
+  "ØªÙˆÙƒÙŠÙ„",
+  "Ù…Ø³ØªÙ†Ø¯ Ø¢Ø®Ø±",
+];
+
+export default function RequestRegistration() {
+  const [customerType, setCustomerType] = useState<"new" | "existing">("new");
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState("");
+
+  const [customer, setCustomer] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    address: "",
+    taxNumber: "",
+    notes: "",
+  });
+
+  const [request, setRequest] = useState({
+    serviceName: "",
+    description: "",
+    priority: "NORMAL",
+    receivedAt: new Date().toISOString().slice(0, 10),
+  });
+
+  const [documents, setDocuments] = useState<
+    { documentType: string; documentNumber: string; expiryDate: string }[]
+  >([]);
+
+  async function searchCustomers(value: string) {
+    setSearch(value);
+    setSelectedCustomer(null);
+    setError("");
+
+    if (value.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+
+    setSearching(true);
+
+    try {
+      const response = await fetch(
+        `/api/customers/search?q=${encodeURIComponent(value.trim())}`
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || "ØªØ¹Ø°Ø± Ø§Ù„Ø¨Ø­Ø« Ø¹Ù† Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡");
+        setResults([]);
+        return;
+      }
+
+      setResults(data.customers || []);
+    } catch {
+      setError("Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function chooseCustomer(item: Customer) {
+    setSelectedCustomer(item);
+    setSearch(item.name);
+    setResults([]);
+
+    setCustomer({
+      name: item.name,
+      phone: item.phone || "",
+      email: item.email || "",
+      address: item.address || "",
+      taxNumber: item.taxNumber || "",
+      notes: item.notes || "",
+    });
+  }
+
+  function updateCustomer(field: string, value: string) {
+    setCustomer((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateRequest(field: string, value: string) {
+    setRequest((current) => ({ ...current, [field]: value }));
+  }
+
+  function addDocument() {
+    setDocuments((current) => [
+      ...current,
+      { documentType: "", documentNumber: "", expiryDate: "" },
+    ]);
+  }
+
+  function updateDocument(
+    index: number,
+    field: string,
+    value: string
+  ) {
+    setDocuments((current) =>
+      current.map((document, i) =>
+        i === index ? { ...document, [field]: value } : document
+      )
+    );
+  }
+
+  return (
+    <div className="form-card">
+      <h2>Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„</h2>
+      <p>Ø­Ø¯Ø¯ Ø¥Ø°Ø§ ÙƒØ§Ù†Øª Ø§Ù„Ø´Ø±ÙƒØ© ØªØªØ¹Ø§Ù…Ù„ Ù…Ø¹Ù†Ø§ Ù„Ø£ÙˆÙ„ Ù…Ø±Ø© Ø£Ù… Ù„Ø¯ÙŠÙ‡Ø§ Ù…Ù„Ù Ø³Ø§Ø¨Ù‚.</p>
+
+      <div className="form-grid">
+        <div className="form-field">
+          <label>Ù†ÙˆØ¹ Ø§Ù„Ø¹Ù…ÙŠÙ„</label>
+          <select
+            value={customerType}
+            onChange={(e) => {
+              const value = e.target.value as "new" | "existing";
+              setCustomerType(value);
+              setSelectedCustomer(null);
+              setSearch("");
+              setResults([]);
+              setError("");
+              setCustomer({
+                name: "",
+                phone: "",
+                email: "",
+                address: "",
+                taxNumber: "",
+                notes: "",
+              });
+            }}
+          >
+            <option value="new">Ø¹Ù…ÙŠÙ„ Ø¬Ø¯ÙŠØ¯</option>
+            <option value="existing">Ø¹Ù…ÙŠÙ„ Ø­Ø§Ù„ÙŠ</option>
+          </select>
+        </div>
+
+        {customerType === "existing" && (
+          <div className="form-field">
+            <label htmlFor="customerSearch">
+              Ø§Ø¨Ø­Ø« Ø¨Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ© Ø£Ùˆ Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ Ø£Ùˆ Ø§Ù„Ø±Ù‚Ù… Ø§Ù„Ø¶Ø±ÙŠØ¨ÙŠ
+            </label>
+            <input
+              id="customerSearch"
+              value={search}
+              onChange={(e) => searchCustomers(e.target.value)}
+              placeholder="Ø§ÙƒØªØ¨ Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ© Ø£Ùˆ Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ..."
+            />
+
+            {searching && <p>Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¨Ø­Ø«...</p>}
+
+            {results.length > 0 && (
+              <div className="customer-search-results">
+                {results.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => chooseCustomer(item)}
+                    className="customer-result"
+                  >
+                    <strong>{item.name}</strong>
+                    <span>
+                      {item.taxNumber || "Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø±Ù‚Ù… Ø¶Ø±ÙŠØ¨ÙŠ"} â€”{" "}
+                      {item.phone || "Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù‡Ø§ØªÙ"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {search.trim().length >= 2 &&
+              !searching &&
+              results.length === 0 &&
+              !selectedCustomer && (
+                <p>Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø¹Ø«ÙˆØ± Ø¹Ù„Ù‰ Ø¹Ù…ÙŠÙ„ Ù…Ø·Ø§Ø¨Ù‚.</p>
+              )}
+          </div>
+        )}
+      </div>
+
+      {selectedCustomer && (
+        <div className="form-card" style={{ marginTop: 20 }}>
+          <h3>Ù…Ù„Ù Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø§Ù„Ù…Ø­ÙÙˆØ¸</h3>
+          <p>
+            ØªÙ… ØªØ­Ù…ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ© Ù…Ù† Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª. ÙŠÙ…ÙƒÙ†Ùƒ ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª
+            Ù‚Ø¨Ù„ Ø­ÙØ¸ Ø§Ù„Ø·Ù„Ø¨.
+          </p>
+
+          <div className="form-grid">
+            {[
+              ["name", "Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ©"],
+              ["phone", "Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ"],
+              ["email", "Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ"],
+              ["address", "Ø§Ù„Ø¹Ù†ÙˆØ§Ù†"],
+              ["taxNumber", "Ø§Ù„Ø±Ù‚Ù… Ø§Ù„Ø¶Ø±ÙŠØ¨ÙŠ"],
+            ].map(([field, label]) => (
+              <div className="form-field" key={field}>
+                <label>{label}</label>
+                <input
+                  value={customer[field as keyof typeof customer]}
+                  onChange={(e) => updateCustomer(field, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+
+          <h3 style={{ marginTop: 24 }}>Ø§Ù„Ù…Ø³ØªÙ†Ø¯Ø§Øª Ø§Ù„Ù…Ø³Ø¬Ù„Ø© Ù„Ù„Ø´Ø±ÙƒØ©</h3>
+
+          {selectedCustomer.documents.length === 0 ? (
+            <p>Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ø³ØªÙ†Ø¯Ø§Øª Ù…Ø­ÙÙˆØ¸Ø© Ù„Ù‡Ø°Ø§ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø­ØªÙ‰ Ø§Ù„Ø¢Ù†.</p>
+          ) : (
+            <div className="form-grid">
+              {selectedCustomer.documents.map((document) => (
+                <div className="form-field" key={document.id}>
+                  <strong>{document.documentType}</strong>
+                  <span>
+                    Ø±Ù‚Ù… Ø§Ù„Ù…Ø³ØªÙ†Ø¯: {document.documentNumber || "ØºÙŠØ± Ù…Ø³Ø¬Ù„"}
+                  </span>
+                  <span>
+                    ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡:{" "}
+                    {document.expiryDate
+                      ? new Date(document.expiryDate).toLocaleDateString("ar-EG")
+                      : "ØºÙŠØ± Ù…Ø­Ø¯Ø¯"}
+                  </span>
+                  {document.filePath && (
+                    <a href={document.filePath} target="_blank" rel="noreferrer">
+                      ÙØªØ­ Ø§Ù„Ù…Ù„Ù Ø§Ù„Ù…Ø­ÙÙˆØ¸
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {(customerType === "new" || selectedCustomer) && (
+        <>
+          <h3 style={{ marginTop: 24 }}>
+            {customerType === "new" ? "Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ© Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©" : "ØªØ¹Ø¯ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø´Ø±ÙƒØ©"}
+          </h3>
+
+          <div className="form-grid">
+            {[
+              ["name", "Ø§Ø³Ù… Ø§Ù„Ø´Ø±ÙƒØ©"],
+              ["phone", "Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ"],
+              ["email", "Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ"],
+              ["address", "Ø§Ù„Ø¹Ù†ÙˆØ§Ù†"],
+              ["taxNumber", "Ø§Ù„Ø±Ù‚Ù… Ø§Ù„Ø¶Ø±ÙŠØ¨ÙŠ"],
+            ].map(([field, label]) => (
+              <div className="form-field" key={field}>
+                <label>{label}</label>
+                <input
+                  required={field === "name"}
+                  value={customer[field as keyof typeof customer]}
+                  onChange={(e) => updateCustomer(field, e.target.value)}
+                  placeholder={`Ø£Ø¯Ø®Ù„ ${label}`}
+                />
+              </div>
+            ))}
+
+            <div className="form-field full-width">
+              <label>Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø¹Ù† Ø§Ù„Ø¹Ù…ÙŠÙ„</label>
+              <textarea
+                rows={3}
+                value={customer.notes}
+                onChange={(e) => updateCustomer("notes", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <h3 style={{ marginTop: 24 }}>Ø¥Ø¶Ø§ÙØ© Ù…Ø³ØªÙ†Ø¯Ø§Øª Ù„Ù„Ø¹Ù…ÙŠÙ„</h3>
+
+          {documents.map((document, index) => (
+            <div className="form-grid" key={index}>
+              <div className="form-field">
+                <label>Ù†ÙˆØ¹ Ø§Ù„Ù…Ø³ØªÙ†Ø¯</label>
+                <select
+                  value={document.documentType}
+                  onChange={(e) =>
+                    updateDocument(index, "documentType", e.target.value)
+                  }
+                >
+                  <option value="">Ø§Ø®ØªØ± Ù†ÙˆØ¹ Ø§Ù„Ù…Ø³ØªÙ†Ø¯</option>
+                  {documentTypes.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label>Ø±Ù‚Ù… Ø§Ù„Ù…Ø³ØªÙ†Ø¯</label>
+                <input
+                  value={document.documentNumber}
+                  onChange={(e) =>
+                    updateDocument(index, "documentNumber", e.target.value)
+                  }
+                />
+              </div>
+
+              <div className="form-field">
+                <label>ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡</label>
+                <input
+                  type="date"
+                  value={document.expiryDate}
+                  onChange={(e) =>
+                    updateDocument(index, "expiryDate", e.target.value)
+                  }
+                />
+              </div>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={addDocument}
+          >
+            + Ø¥Ø¶Ø§ÙØ© Ù…Ø³ØªÙ†Ø¯
+          </button>
+        </>
+      )}
+
+      <hr style={{ margin: "28px 0" }} />
+
+      <h2>Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø·Ù„Ø¨ Ø§Ù„Ø¬Ø¯ÙŠØ¯</h2>
+
+      <div className="form-grid">
+        <div className="form-field">
+          <label>Ø§Ù„Ø®Ø¯Ù…Ø© Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø©</label>
+          <input
+            value={request.serviceName}
+            onChange={(e) => updateRequest("serviceName", e.target.value)}
+            placeholder="Ø§ÙƒØªØ¨ Ø§Ù„Ø®Ø¯Ù…Ø© Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø©"
+          />
+        </div>
+
+        <div className="form-field">
+          <label>ØªØ§Ø±ÙŠØ® Ø§Ø³ØªÙ„Ø§Ù… Ø§Ù„Ø·Ù„Ø¨</label>
+          <input
+            type="date"
+            value={request.receivedAt}
+            onChange={(e) => updateRequest("receivedAt", e.target.value)}
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Ø§Ù„Ø£ÙˆÙ„ÙˆÙŠØ©</label>
+          <select
+            value={request.priority}
+            onChange={(e) => updateRequest("priority", e.target.value)}
+          >
+            <option value="NORMAL">Ø¹Ø§Ø¯ÙŠ</option>
+            <option value="MEDIUM">Ù…ØªÙˆØ³Ø·</option>
+            <option value="URGENT">Ø¹Ø§Ø¬Ù„</option>
+          </select>
+        </div>
+
+        <div className="form-field full-width">
+          <label>ÙˆØµÙ Ø§Ù„Ø·Ù„Ø¨</label>
+          <textarea
+            rows={4}
+            value={request.description}
+            onChange={(e) => updateRequest("description", e.target.value)}
+          />
+        </div>
+      </div>
+
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      <p style={{ marginTop: 20, color: "#64748b" }}>
+        ØªÙ… ØªØ¬Ù‡ÙŠØ² Ø§Ù„Ø¨Ø­Ø« ÙˆØ¹Ø±Ø¶ Ù…Ù„Ù Ø§Ù„Ø¹Ù…ÙŠÙ„. Ø§Ù„Ø®Ø·ÙˆØ© Ø§Ù„ØªØ§Ù„ÙŠØ© Ù‡ÙŠ Ø±Ø¨Ø· Ø²Ø± Ø§Ù„Ø­ÙØ¸
+        Ø¨Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª ÙˆØ±ÙØ¹ Ù…Ù„ÙØ§Øª Ø§Ù„Ù…Ø³ØªÙ†Ø¯Ø§Øª ÙØ¹Ù„ÙŠÙ‹Ø§.
+      </p>
+    </div>
+  );
+}
+

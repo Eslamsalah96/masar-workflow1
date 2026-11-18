@@ -1,0 +1,1028 @@
+﻿
+
+========== app/middleware.ts ==========
+
+
+========== app/page.tsx ==========
+"use client";
+
+import { useRouter } from "next/navigation";
+
+const stages = [
+  {
+    id: "requests",
+    number: 1,
+    title: "تسجيل الطلب",
+    description: "إضافة بيانات العميل والطلب الجديد",
+  },
+  {
+    id: "transfer",
+    number: 2,
+    title: "تحويل الطلب",
+    description: "توجيه الطلب إلى القسم المختص بالشركة",
+  },
+  {
+    id: "documents",
+    number: 3,
+    title: "استكمال المستندات",
+    description: "تسجيل ومتابعة المستندات المطلوبة",
+  },
+  {
+    id: "matching",
+    number: 4,
+    title: "مطابقة المستندات",
+    description: "مراجعة المستندات والتأكد من مطابقتها",
+  },
+  {
+    id: "tasks",
+    number: 5,
+    title: "توزيع المهام",
+    description: "اختيار المهمة وتحديد الموظف المسؤول",
+  },
+  {
+    id: "execution",
+    number: 6,
+    title: "تنفيذ المهمة",
+    description: "متابعة تنفيذ المهمة وتسجيل النتائج",
+  },
+  {
+    id: "review",
+    number: 7,
+    title: "المراجعة",
+    description: "اعتماد التنفيذ أو إعادته للتعديل",
+  },
+  {
+    id: "delivery",
+    number: 8,
+    title: "التسليم",
+    description: "تسليم المخرجات النهائية للعميل",
+  },
+  {
+    id: "closure",
+    number: 9,
+    title: "إغلاق الطلب",
+    description: "تأكيد الاستلام وإغلاق الطلب",
+  },
+];
+
+export default function Dashboard() {
+  const router = useRouter();
+
+  return (
+    <main className="workflow-layout" dir="rtl">
+      <aside className="sidebar">
+        <h2>خاطر اللواج</h2>
+        <p>نظام إدارة الطلبات</p>
+
+        <nav>
+          {stages.map((stage) => (
+            <button
+              key={stage.id}
+              className="nav-item"
+              onClick={() => router.push(`/workflow/${stage.id}`)}
+            >
+              {stage.title}
+            </button>
+          ))}
+
+          <button
+            className="nav-item"
+            onClick={() => router.push("/settings")}
+          >
+            الإعدادات
+          </button>
+        </nav>
+      </aside>
+
+      <section className="main-content">
+        <div className="page-heading">
+          <div>
+            <span className="eyebrow">مرحبًا بك</span>
+            <h1>لوحة التحكم</h1>
+            <p>إدارة ومتابعة جميع مراحل الطلبات داخل الشركة.</p>
+          </div>
+
+          <button
+            className="primary-button"
+            onClick={() => router.push("/requests")}
+          >
+            + تسجيل طلب جديد
+          </button>
+        </div>
+
+        <div className="dashboard-stats">
+          <div className="stat-card">
+            <span>إجمالي المراحل</span>
+            <strong>9</strong>
+          </div>
+
+          <div className="stat-card">
+            <span>نظام العمل</span>
+            <strong>متابعة الطلبات</strong>
+          </div>
+
+          <div className="stat-card">
+            <span>حالة النظام</span>
+            <strong>نشط</strong>
+          </div>
+        </div>
+
+        <div className="section-heading">
+          <h2>مراحل سير العمل</h2>
+          <p>اضغط على أي مرحلة لفتحها.</p>
+        </div>
+
+        <div className="stage-grid">
+          {stages.map((stage) => (
+            <button
+              key={stage.id}
+              className="stage-card"
+              onClick={() => router.push(`/workflow/${stage.id}`)}
+            >
+              <span className="stage-number">{stage.number}</span>
+              <h3>{stage.title}</h3>
+              <p>{stage.description}</p>
+              <span className="stage-link">فتح المرحلة ←</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+
+========== app/dashboard/page.tsx ==========
+export default function DashboardPage() {
+  return (
+    <main dir="rtl" className="p-6">
+      <h1 className="text-2xl font-bold">لوحة التحكم</h1>
+      <p className="mt-2 text-gray-600">
+        مرحبًا بك في نظام إدارة الإجراءات.
+      </p>
+    </main>
+  );
+}
+
+
+========== app/requests/page.tsx ==========
+export default function Page() {
+  return (
+    <main dir="rtl" className="main-content">
+      <div className="page-heading">
+        <div>
+          <h1>الطلبات</h1>
+          <p>هذه الصفحة قيد التجهيز.</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+
+
+========== app/requests/[id]/page.tsx ==========
+export default function Page() {
+  return (
+    <main dir="rtl" className="main-content">
+      <div className="page-heading">
+        <div>
+          <h1>تفاصيل الطلب</h1>
+          <p>هذه الصفحة قيد التجهيز.</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+
+
+========== app/departments/page.tsx ==========
+export default function Page() {
+  return (
+    <main dir="rtl" className="main-content">
+      <div className="page-heading">
+        <div>
+          <h1>الأقسام</h1>
+          <p>هذه الصفحة قيد التجهيز.</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+
+
+========== app/tasks/page.tsx ==========
+export default function Page() {
+  return (
+    <main dir="rtl" className="main-content">
+      <div className="page-heading">
+        <div>
+          <h1>المهام</h1>
+          <p>هذه الصفحة قيد التجهيز.</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+
+
+========== app/execution/[id]/page.tsx ==========
+export default function Page() {
+  return (
+    <main dir="rtl" className="main-content">
+      <div className="page-heading">
+        <div>
+          <h1>تنفيذ المهمة</h1>
+          <p>هذه الصفحة قيد التجهيز.</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+
+
+========== app/reports/page.tsx ==========
+export default function Page() {
+  return (
+    <main dir="rtl" className="main-content">
+      <div className="page-heading">
+        <div>
+          <h1>التقارير</h1>
+          <p>هذه الصفحة قيد التجهيز.</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+
+
+========== app/users/page.tsx ==========
+export default function Page() {
+  return (
+    <main dir="rtl" className="main-content">
+      <div className="page-heading">
+        <div>
+          <h1>المستخدمون</h1>
+          <p>هذه الصفحة قيد التجهيز.</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+
+
+========== components/Sidebar.tsx ==========
+
+
+========== components/Header.tsx ==========
+
+
+========== components/ProtectedPage.tsx ==========
+
+
+========== components/TaskTable.tsx ==========
+
+
+========== app/api/customers/search/route.ts ==========
+
+import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { message: "يجب تسجيل الدخول أولًا" },
+        { status: 401 }
+      );
+    }
+
+    const query = request.nextUrl.searchParams.get("q")?.trim() || "";
+
+    if (query.length < 2) {
+      return NextResponse.json({ customers: [] });
+    }
+
+    const customers = await prisma.customer.findMany({
+      where: {
+        OR: [
+          { name: { contains: query } },
+          { phone: { contains: query } },
+          { taxNumber: { contains: query } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        address: true,
+        taxNumber: true,
+        notes: true,
+        documents: {
+          select: {
+            id: true,
+            documentType: true,
+            documentNumber: true,
+            issueDate: true,
+            expiryDate: true,
+            filePath: true,
+            notes: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+      take: 10,
+      orderBy: { name: "asc" },
+    });
+
+    return NextResponse.json({ customers });
+  } catch (error) {
+    console.error("Customer search error:", error);
+
+    return NextResponse.json(
+      { message: "حدث خطأ أثناء البحث عن العميل" },
+      { status: 500 }
+    );
+  }
+}
+
+
+
+========== prisma/seed.ts ==========
+
+import { hash } from "bcryptjs";
+import { prisma } from "../lib/prisma";
+
+async function main() {
+  // إنشاء الأقسام الأربعة
+  const departmentNames = [
+    "الضرائب",
+    "الحسابات",
+    "الإجراءات",
+    "خدمة العملاء واتصالات العملاء",
+  ];
+
+  const departments = await Promise.all(
+    departmentNames.map((name) =>
+      prisma.department.upsert({
+        where: { name },
+        update: {},
+        create: { name },
+      })
+    )
+  );
+
+  const [taxes, accounts, procedures, customerService] = departments;
+
+  // تشفير كلمات المرور
+  const passwordHash = await hash("Masar@2026", 10);
+
+  // المدير العام
+  await prisma.user.upsert({
+    where: { email: "admin@masar.com" },
+    update: {
+      name: "المدير العام",
+      role: "GENERAL_MANAGER",
+      passwordHash,
+      departmentId: null,
+    },
+    create: {
+      name: "المدير العام",
+      email: "admin@masar.com",
+      passwordHash,
+      role: "GENERAL_MANAGER",
+    },
+  });
+
+  // مدراء الأقسام
+  const managers = [
+    {
+      name: "مدير الضرائب",
+      email: "tax.manager@masar.com",
+      departmentId: taxes.id,
+    },
+    {
+      name: "مدير الحسابات",
+      email: "accounts.manager@masar.com",
+      departmentId: accounts.id,
+    },
+    {
+      name: "مدير الإجراءات",
+      email: "procedures.manager@masar.com",
+      departmentId: procedures.id,
+    },
+    {
+      name: "مدير خدمة العملاء",
+      email: "service.manager@masar.com",
+      departmentId: customerService.id,
+    },
+  ];
+
+  for (const manager of managers) {
+    await prisma.user.upsert({
+      where: { email: manager.email },
+      update: {
+        name: manager.name,
+        role: "DEPARTMENT_MANAGER",
+        departmentId: manager.departmentId,
+        passwordHash,
+      },
+      create: {
+        ...manager,
+        passwordHash,
+        role: "DEPARTMENT_MANAGER",
+      },
+    });
+  }
+
+  // موظفون تجريبيون
+  const employees = [
+    {
+      name: "موظف الضرائب 1",
+      email: "tax.employee1@masar.com",
+      departmentId: taxes.id,
+    },
+    {
+      name: "موظف الضرائب 2",
+      email: "tax.employee2@masar.com",
+      departmentId: taxes.id,
+    },
+    {
+      name: "موظف الحسابات 1",
+      email: "accounts.employee1@masar.com",
+      departmentId: accounts.id,
+    },
+    {
+      name: "موظف الحسابات 2",
+      email: "accounts.employee2@masar.com",
+      departmentId: accounts.id,
+    },
+    {
+      name: "موظف الإجراءات 1",
+      email: "procedures.employee1@masar.com",
+      departmentId: procedures.id,
+    },
+    {
+      name: "موظف الإجراءات 2",
+      email: "procedures.employee2@masar.com",
+      departmentId: procedures.id,
+    },
+    {
+      name: "موظف خدمة العملاء 1",
+      email: "service.employee1@masar.com",
+      departmentId: customerService.id,
+    },
+    {
+      name: "موظف خدمة العملاء 2",
+      email: "service.employee2@masar.com",
+      departmentId: customerService.id,
+    },
+  ];
+
+  for (const employee of employees) {
+    await prisma.user.upsert({
+      where: { email: employee.email },
+      update: {
+        name: employee.name,
+        role: "EMPLOYEE",
+        departmentId: employee.departmentId,
+        passwordHash,
+      },
+      create: {
+        ...employee,
+        passwordHash,
+        role: "EMPLOYEE",
+      },
+    });
+  }
+
+  console.log("تم إنشاء الأقسام والمستخدمين التجريبيين بنجاح.");
+}
+
+main()
+  .catch((error) => {
+    console.error("حدث خطأ أثناء إضافة البيانات:", error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+
+
+========== prisma/seed-services.ts ==========
+
+import { prisma } from "../lib/prisma";
+
+async function main() {
+  console.log("بدء إضافة خدمات دليل GAFI...");
+
+  // ==========================================
+  // 1. إنشاء تصنيف الخدمات
+  // ==========================================
+
+  const category = await prisma.serviceCategory.upsert({
+    where: {
+      slug: "company-incorporation",
+    },
+    update: {
+      name: "تأسيس الشركات",
+      description: "خدمات تأسيس الشركات وفق دليل خدمات GAFI",
+      isActive: true,
+    },
+    create: {
+      name: "تأسيس الشركات",
+      slug: "company-incorporation",
+      description: "خدمات تأسيس الشركات وفق دليل خدمات GAFI",
+      sortOrder: 1,
+    },
+  });
+
+  // ==========================================
+  // 2. إنشاء الخدمة الرئيسية
+  // ==========================================
+
+  const service = await prisma.service.upsert({
+    where: {
+      slug: "capital-companies",
+    },
+    update: {
+      name: "تأسيس شركات الأموال",
+      categoryId: category.id,
+      description:
+        "تأسيس الشركات المساهمة وشركات التوصية بالأسهم والشركات ذات المسؤولية المحدودة",
+      sourceName: "دليل خدمات مركز المستثمرين - GAFI 2026",
+      sourcePage: 5,
+      isActive: true,
+    },
+    create: {
+      name: "تأسيس شركات الأموال",
+      slug: "capital-companies",
+      categoryId: category.id,
+      description:
+        "تأسيس الشركات المساهمة وشركات التوصية بالأسهم والشركات ذات المسؤولية المحدودة",
+      sourceName: "دليل خدمات مركز المستثمرين - GAFI 2026",
+      sourcePage: 5,
+      sortOrder: 1,
+    },
+  });
+
+  // ==========================================
+  // 3. أنواع الشركات
+  // ==========================================
+
+  const variantData = [
+    {
+      name: "شركة مساهمة",
+      slug: "joint-stock",
+      description: "تأسيس شركة مساهمة",
+      sortOrder: 1,
+    },
+    {
+      name: "شركة توصية بالأسهم",
+      slug: "partnership-limited-by-shares",
+      description: "تأسيس شركة توصية بالأسهم",
+      sortOrder: 2,
+    },
+    {
+      name: "شركة ذات مسؤولية محدودة",
+      slug: "limited-liability",
+      description: "تأسيس شركة ذات مسؤولية محدودة",
+      sortOrder: 3,
+    },
+  ];
+
+  const variants: Record<string, string> = {};
+
+  for (const item of variantData) {
+    const variant = await prisma.serviceVariant.upsert({
+      where: {
+        serviceId_slug: {
+          serviceId: service.id,
+          slug: item.slug,
+        },
+      },
+      update: {
+        name: item.name,
+        description: item.description,
+        isActive: true,
+        sortOrder: item.sortOrder,
+      },
+      create: {
+        serviceId: service.id,
+        name: item.name,
+        slug: item.slug,
+        description: item.description,
+        sortOrder: item.sortOrder,
+      },
+    });
+
+    variants[item.slug] = variant.id;
+  }
+
+  // ==========================================
+  // 4. المستندات المطلوبة
+  // ==========================================
+
+  const requirements = [
+    {
+      code: "CAPITAL-COMPANY-NAME-CERTIFICATE",
+      title: "شهادة عدم التباس الاسم",
+      details: "شهادة معتمدة من السجل التجاري.",
+      condition: null,
+      variantSlug: null,
+      isRequired: true,
+      sortOrder: 1,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-BANK-JOINT-STOCK",
+      title: "الشهادة البنكية بإيداع رأس المال",
+      details:
+        "إيداع 10% على الأقل من قيمة رأس المال المصدر، مع استكمال النسبة إلى 25% خلال 3 أشهر وإلى 100% خلال 5 سنوات وفق الدليل.",
+      condition: "تطبق على الشركة المساهمة.",
+      variantSlug: "joint-stock",
+      isRequired: true,
+      sortOrder: 2,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-BANK-PARTNERSHIP",
+      title: "الشهادة البنكية بإيداع رأس المال",
+      details:
+        "إيداع 10% على الأقل من قيمة رأس المال المصدر، مع استكمال النسبة إلى 25% خلال 3 أشهر وإلى 100% خلال 5 سنوات وفق الدليل.",
+      condition: "تطبق على شركة التوصية بالأسهم.",
+      variantSlug: "partnership-limited-by-shares",
+      isRequired: true,
+      sortOrder: 2,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-POA",
+      title: "صورة توكيلات التأسيس",
+      details:
+        "صورة التوكيلات في حالة التأسيس عن طريق وكيل، على أن يتضمن التوكيل صلاحية تأسيس الشركات والتوقيع على عقود التأسيس.",
+      condition:
+        "إذا تم التأسيس عن طريق وكيل، مع مراعاة عدد المؤسسين أو الشركاء المطلوب صدور التوكيل منهم بحسب نوع الشركة.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 3,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-IDENTITY",
+      title: "صور إثبات الشخصية للمؤسسين أو الشركاء",
+      details:
+        "صور واضحة وسارية من إثبات الشخصية، مع جواز الاطلاع على الأصل.",
+      condition: "الرقم القومي للمصريين، وجواز السفر للأجانب.",
+      variantSlug: null,
+      isRequired: true,
+      sortOrder: 4,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-AUDITOR-ELIGIBILITY",
+      title: "مستخرج رسمي من سجل المحاسبين والمراجعين",
+      details:
+        "مستخرج رسمي موجه إلى الهيئة يفيد أحقية مراقب الحسابات في مراجعة واعتماد ميزانيات شركات الأموال.",
+      condition:
+        "يقدم المستند أو صورة وإقرار قبول التعيين وفق الحالة الموضحة بالدليل.",
+      variantSlug: null,
+      isRequired: true,
+      sortOrder: 5,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-LAWYER-CARD",
+      title: "صورة كارنيه القيد بنقابة المحامين",
+      details:
+        "صورة كارنيه القيد للمحامي الذي يصدق على العقد أمام نقابة المحامين.",
+      condition:
+        "إذا كان رأس المال 20,000 جنيه أو أكثر، يشترط أن يكون القيد بدرجة محام ابتدائي على الأقل وأن يكون الكارنيه ساريًا.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 6,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-ACCOUNTANT-FORMS",
+      title: "نماذج مستعلمين عن المؤسسين أو الشركاء",
+      details: "نماذج مستعلمين عن المؤسسين أو الشركاء.",
+      condition: null,
+      variantSlug: null,
+      isRequired: true,
+      sortOrder: 7,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-LEGAL-ADVISOR",
+      title: "بيانات المستشار القانوني للشركة",
+      details: "تحديد اسم وعنوان المستشار القانوني للشركة.",
+      condition: "ألا تقل درجة القيد عن محام استئناف.",
+      variantSlug: null,
+      isRequired: true,
+      sortOrder: 8,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-AGENT-IDENTITY",
+      title: "صورة إثبات شخصية الوكيل",
+      details: "صورة واضحة وسارية من إثبات شخصية الوكيل.",
+      condition:
+        "تقدم عند التأسيس عن طريق وكيل. الرقم القومي للمصري، وجواز السفر للأجنبي مع وجود إقامة سارية.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 9,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-AUTHORITY-APPROVAL",
+      title: "موافقة الجهة المختصة",
+      details:
+        "موافقة الجهة المختصة إذا كان أي من أغراض الشركة يستوجب الحصول على موافقة خاصة.",
+      condition: "تطبق وفق القوانين المنظمة للنشاط.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 10,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-IN-KIND-JOINT-STOCK",
+      title: "تقرير تقييم الحصة العينية",
+      details:
+        "أصل تقرير اللجنة المشكلة من الهيئة العامة للاستثمار والمناطق الحرة لتقييم الحصة العينية.",
+      condition:
+        "عند وجود حصة عينية في شركة مساهمة.",
+      variantSlug: "joint-stock",
+      isRequired: false,
+      sortOrder: 11,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-IN-KIND-PARTNERSHIP",
+      title: "تقرير تقييم الحصة العينية",
+      details:
+        "أصل تقرير اللجنة المشكلة من الهيئة العامة للاستثمار والمناطق الحرة لتقييم الحصة العينية.",
+      condition:
+        "عند وجود حصة عينية في شركة توصية بالأسهم.",
+      variantSlug: "partnership-limited-by-shares",
+      isRequired: false,
+      sortOrder: 12,
+      sourcePage: 5,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-IN-KIND-LLC",
+      title: "تقرير تقييم الحصة العينية",
+      details:
+        "يجوز الاكتفاء بتقديم تقرير من أهل الخبرة من أصحاب المهن المنظمة بقانون، بحسب طبيعة كل حصة.",
+      condition:
+        "عند وجود حصة عينية في شركة ذات مسؤولية محدودة.",
+      variantSlug: "limited-liability",
+      isRequired: false,
+      sortOrder: 13,
+      sourcePage: 6,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-FREE-ZONE-APPROVAL",
+      title: "موافقة المنطقة الحرة",
+      details: "استيفاء موافقة الهيئة قبل التأسيس.",
+      condition:
+        "عند تأسيس الشركة للعمل بنظام المناطق الحرة العامة، تصدر الموافقة من مجلس إدارة المنطقة الحرة المزمع إقامة المشروع بها.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 14,
+      sourcePage: 6,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-PRIVATE-FREE-ZONE-APPROVAL",
+      title: "موافقة مجلس الوزراء",
+      details: "استيفاء موافقة مجلس الوزراء قبل التأسيس.",
+      condition:
+        "عند تأسيس شركة مساهمة أو ذات مسؤولية محدودة للعمل بنظام المناطق الحرة الخاصة.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 15,
+      sourcePage: 6,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-TRANSFORMATION-VALUATION",
+      title: "تقرير تقييم صافي أصول وخصوم شركة الأشخاص",
+      details:
+        "تقرير تقييم الحصة العينية، ويكون التقرير من اللجنة المشكلة بقرار رئيس الهيئة لهذا الغرض.",
+      condition:
+        "عند تأسيس شركة أموال ناتجة عن تغيير الشكل القانوني لشركة أشخاص.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 16,
+      sourcePage: 6,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-TRANSFORMATION-DOCUMENTS",
+      title: "مستندات شركة الأشخاص قبل تغيير الشكل القانوني",
+      details:
+        "عقد تكوين شركة الأشخاص وملخصه، وكافة عقود التعديلات اللاحقة وملخصاتها المشهرة قانونًا، ومحاضر اجتماعات الشركاء الموضحة بالدليل.",
+      condition:
+        "عند تأسيس شركة أموال نتيجة تغيير الشكل القانوني لشركة أشخاص.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 17,
+      sourcePage: 6,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-SPLIT-DECISION",
+      title: "قرار رئيس الهيئة بالتقسيم",
+      details: "قرار رئيس الهيئة بالتقسيم.",
+      condition:
+        "عند تأسيس شركة أموال عن طريق انقسام شركة قائمة إلى شركتين أو أكثر.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 18,
+      sourcePage: 6,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-SPLIT-VALUATION",
+      title: "تقرير تقييم الحصة العينية عند الانقسام",
+      details: "تقرير تقييم الحصة العينية.",
+      condition:
+        "عند تأسيس شركة أموال عن طريق انقسام شركة قائمة.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 19,
+      sourcePage: 6,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-SPLIT-REGISTRY",
+      title: "السجل التجاري للشركة القاسمة",
+      details:
+        "السجل التجاري للشركة القاسمة والمؤشر به بالانقسام.",
+      condition:
+        "عند تأسيس شركة أموال عن طريق انقسام شركة قائمة.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 20,
+      sourcePage: 6,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-SPLIT-ASSEMBLY-MINUTES",
+      title: "محضر الجمعية العامة غير العادية بالموافقة على الانقسام",
+      details:
+        "صورة من محضر اجتماع الجمعية العامة غير العادية للشركة بالموافقة على الانقسام، ومعتمد من الهيئة.",
+      condition:
+        "عند تأسيس شركة أموال عن طريق انقسام شركة قائمة.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 21,
+      sourcePage: 6,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-SPLIT-VALUATION-MINUTES",
+      title: "محضر الجمعية العامة غير العادية بالموافقة على تقرير التقييم",
+      details:
+        "صورة من محضر اجتماع الجمعية العامة غير العادية للشركة بالموافقة على تقرير التقييم، ومعتمد من الهيئة.",
+      condition:
+        "عند تأسيس شركة أموال عن طريق انقسام شركة قائمة.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 22,
+      sourcePage: 6,
+    },
+
+    {
+      code: "CAPITAL-COMPANY-SPLIT-PROJECT",
+      title: "مشروع عقد الانقسام",
+      details: "مشروع عقد الانقسام المعتمد من الهيئة.",
+      condition:
+        "عند تأسيس شركة أموال عن طريق انقسام شركة قائمة.",
+      variantSlug: null,
+      isRequired: false,
+      sortOrder: 23,
+      sourcePage: 6,
+    },
+  ];
+
+  // ==========================================
+  // 5. إضافة المستندات إلى قاعدة البيانات
+  // ==========================================
+
+  for (const item of requirements) {
+    const variantId = item.variantSlug
+      ? variants[item.variantSlug]
+      : null;
+
+    await prisma.serviceDocumentRequirement.upsert({
+      where: {
+        code: item.code,
+      },
+      update: {
+        serviceId: service.id,
+        variantId,
+        title: item.title,
+        details: item.details,
+        condition: item.condition,
+        isRequired: item.isRequired,
+        sortOrder: item.sortOrder,
+        sourcePage: item.sourcePage,
+        sourceNote: "دليل خدمات مركز المستثمرين GAFI - صفحات 5 و6",
+      },
+      create: {
+        code: item.code,
+        serviceId: service.id,
+        variantId,
+        title: item.title,
+        details: item.details,
+        condition: item.condition,
+        isRequired: item.isRequired,
+        sortOrder: item.sortOrder,
+        sourcePage: item.sourcePage,
+        sourceNote: "دليل خدمات مركز المستثمرين GAFI - صفحات 5 و6",
+      },
+    });
+  }
+
+  // ==========================================
+  // 6. التحقق من البيانات بعد الإدخال
+  // ==========================================
+
+  const result = await prisma.service.findUnique({
+    where: {
+      id: service.id,
+    },
+    include: {
+      category: true,
+      variants: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+      },
+      documentRequirements: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+      },
+    },
+  });
+
+  if (!result) {
+    throw new Error("لم يتم العثور على الخدمة بعد الإدخال");
+  }
+
+  console.log("\n================================");
+  console.log("تم إدخال الخدمة بنجاح");
+  console.log("================================");
+  console.log("التصنيف:", result.category.name);
+  console.log("الخدمة:", result.name);
+  console.log("عدد أنواع الشركات:", result.variants.length);
+  console.log(
+    "عدد متطلبات المستندات:",
+    result.documentRequirements.length
+  );
+  console.log("\nأنواع الشركات:");
+
+  for (const variant of result.variants) {
+    console.log("-", variant.name);
+  }
+
+  console.log("\nتم الانتهاء بنجاح.");
+}
+
+main()
+  .catch((error) => {
+    console.error("حدث خطأ أثناء إضافة الخدمات:", error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+

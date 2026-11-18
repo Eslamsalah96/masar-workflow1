@@ -1,0 +1,1755 @@
+﻿فحص الملفات الأساسية للمشروع
+
+========== prisma/schema.prisma ==========
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ==========================================
+// الأقسام
+// ==========================================
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  users              User[]
+  requests           Request[]           @relation("CurrentDepartment")
+  tasks              WorkflowTask[]
+  taskTypes          TaskType[]
+  procedureTemplates ProcedureTemplate[]
+  incomingTransfers  RequestTransfer[]   @relation("ToDepartment")
+  outgoingTransfers  RequestTransfer[]   @relation("FromDepartment")
+}
+
+// ==========================================
+// الموظفون والمديرون
+// ==========================================
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String
+  departmentId String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  department      Department?       @relation(fields: [departmentId], references: [id])
+  createdRequests Request[]         @relation("RequestCreator")
+  assignedTasks   WorkflowTask[]    @relation("TaskAssignee")
+  createdTasks    WorkflowTask[]    @relation("TaskAssigner")
+  transfers       RequestTransfer[]
+  activities      ActivityLog[]
+  expenses        Expense[]
+  notifications   Notification[]
+}
+
+// ==========================================
+// العملاء
+// ==========================================
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  taxNumber String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents CustomerDocument[]
+  requests  Request[]
+}
+
+// ==========================================
+// مستندات وبيانات العميل
+// ==========================================
+
+model CustomerDocument {
+  id             String    @id @default(cuid())
+  customerId     String
+  documentType   String
+  documentNumber String?
+  issueDate      DateTime?
+  expiryDate     DateTime?
+  filePath       String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// الطلبات
+// ==========================================
+
+model Request {
+  id                  String  @id @default(cuid())
+  requestNumber       String  @unique
+  customerId          String
+  createdById         String
+  currentDepartmentId String?
+
+  // بيانات الخدمة
+  serviceName      String
+  serviceId        String?
+  serviceVariantId String?
+
+  description String?
+  priority    String    @default("NORMAL")
+  status      String    @default("NEW")
+  receivedAt  DateTime  @default(now())
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  customer          Customer    @relation(fields: [customerId], references: [id])
+  createdBy         User        @relation("RequestCreator", fields: [createdById], references: [id])
+  currentDepartment Department? @relation("CurrentDepartment", fields: [currentDepartmentId], references: [id])
+
+  // علاقات الخدمة
+  service        Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  serviceVariant ServiceVariant? @relation(fields: [serviceVariantId], references: [id], onDelete: SetNull)
+
+  // علاقات الطلب
+  attachments          RequestAttachment[]
+  tasks                WorkflowTask[]
+  transfers            RequestTransfer[]
+  activities           ActivityLog[]
+  expenses             Expense[]
+  documentRequirements RequestDocumentRequirement[]
+
+  @@index([serviceId])
+  @@index([serviceVariantId])
+  @@index([customerId])
+  @@index([requestNumber])
+}
+
+// ==========================================
+// مرفقات الطلب
+// ==========================================
+
+model RequestAttachment {
+  id        String   @id @default(cuid())
+  requestId String
+  fileName  String
+  filePath  String
+  createdAt DateTime @default(now())
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// سجل تحويل الطلبات بين الأقسام
+// ==========================================
+
+model RequestTransfer {
+  id               String   @id @default(cuid())
+  requestId        String
+  fromDepartmentId String?
+  toDepartmentId   String
+  transferredById  String
+  notes            String?
+  transferredAt    DateTime @default(now())
+
+  request        Request     @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fromDepartment Department? @relation("FromDepartment", fields: [fromDepartmentId], references: [id])
+  toDepartment   Department  @relation("ToDepartment", fields: [toDepartmentId], references: [id])
+  transferredBy  User        @relation(fields: [transferredById], references: [id])
+}
+
+// ==========================================
+// أنواع المهام
+// ==========================================
+
+model TaskType {
+  id                  String  @id @default(cuid())
+  name                String
+  departmentId        String
+  procedureTemplateId String?
+  isActive            Boolean @default(true)
+
+  department        Department         @relation(fields: [departmentId], references: [id])
+  procedureTemplate ProcedureTemplate? @relation(fields: [procedureTemplateId], references: [id])
+  tasks             WorkflowTask[]
+
+  @@unique([name, departmentId])
+}
+
+// ==========================================
+// قوالب الإجراءات وخطواتها
+// ==========================================
+
+model ProcedureTemplate {
+  id           String  @id @default(cuid())
+  name         String
+  departmentId String
+  description  String?
+  isActive     Boolean @default(true)
+
+  department Department              @relation(fields: [departmentId], references: [id])
+  steps      ProcedureStepTemplate[]
+  taskTypes  TaskType[]
+  tasks      WorkflowTask[]
+}
+
+model ProcedureStepTemplate {
+  id                  String  @id @default(cuid())
+  procedureTemplateId String
+  title               String
+  description         String?
+  order               Int
+
+  procedureTemplate ProcedureTemplate @relation(fields: [procedureTemplateId], references: [id], onDelete: Cascade)
+  taskSteps         TaskStep[]
+}
+
+// ==========================================
+// المهام الموزعة على الموظفين
+// ==========================================
+
+model WorkflowTask {
+  id                  String    @id @default(cuid())
+  requestId           String
+  departmentId        String
+  taskTypeId          String
+  procedureTemplateId String?
+  assignedToId        String?
+  assignedById        String
+  title               String
+  instructions        String?
+  status              String    @default("PENDING")
+  startedAt           DateTime?
+  expectedEndAt       DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  request           Request            @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  department        Department         @relation(fields: [departmentId], references: [id])
+  taskType          TaskType           @relation(fields: [taskTypeId], references: [id])
+  procedureTemplate ProcedureTemplate? @relation(fields: [procedureTemplateId], references: [id])
+  assignedTo        User?              @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  assignedBy        User               @relation("TaskAssigner", fields: [assignedById], references: [id])
+
+  steps       TaskStep[]
+  attachments TaskAttachment[]
+  expenses    Expense[]
+  activities  ActivityLog[]
+}
+
+// ==========================================
+// خطوات تنفيذ المهمة
+// ==========================================
+
+model TaskStep {
+  id             String    @id @default(cuid())
+  taskId         String
+  templateStepId String?
+  title          String
+  notes          String?
+  status         String    @default("PENDING")
+  completedAt    DateTime?
+  order          Int
+
+  task         WorkflowTask           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  templateStep ProcedureStepTemplate? @relation(fields: [templateStepId], references: [id])
+}
+
+// ==========================================
+// مرفقات تنفيذ المهمة
+// ==========================================
+
+model TaskAttachment {
+  id        String   @id @default(cuid())
+  taskId    String
+  fileName  String
+  filePath  String
+  createdAt DateTime @default(now())
+
+  task WorkflowTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// المصروفات
+// ==========================================
+
+model Expense {
+  id          String   @id @default(cuid())
+  requestId   String
+  taskId      String?
+  employeeId  String
+  amount      Float
+  description String
+  createdAt   DateTime @default(now())
+
+  request  Request       @relation(fields: [requestId], references: [id])
+  task     WorkflowTask? @relation(fields: [taskId], references: [id])
+  employee User          @relation(fields: [employeeId], references: [id])
+}
+
+// ==========================================
+// سجل الأحداث والتعديلات
+// ==========================================
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  requestId String?
+  taskId    String?
+  userId    String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  request Request?      @relation(fields: [requestId], references: [id])
+  task    WorkflowTask? @relation(fields: [taskId], references: [id])
+  user    User          @relation(fields: [userId], references: [id])
+}
+
+// ==========================================
+// الإشعارات
+// ==========================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// دليل خدمات GAFI
+// ==========================================
+
+// تصنيفات الخدمات
+model ServiceCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  services Service[]
+}
+
+// الخدمات
+model Service {
+  id          String   @id @default(cuid())
+  categoryId  String
+  name        String
+  slug        String   @unique
+  description String?
+  sourceName  String?
+  sourcePage  Int?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category             ServiceCategory              @relation(fields: [categoryId], references: [id])
+  variants             ServiceVariant[]
+  documentRequirements ServiceDocumentRequirement[]
+  requests             Request[]
+
+  @@index([categoryId])
+}
+
+// أنواع أو أشكال الخدمة
+model ServiceVariant {
+  id          String   @id @default(cuid())
+  serviceId   String
+  name        String
+  slug        String
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  documentRequirements ServiceDocumentRequirement[]
+  requests             Request[]
+
+  @@unique([serviceId, slug])
+  @@index([serviceId])
+}
+
+// المستندات المطلوبة لكل خدمة أو نوع خدمة
+model ServiceDocumentRequirement {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  serviceId  String
+  variantId  String?
+  title      String
+  details    String?
+  condition  String?
+  isRequired Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  sourcePage Int?
+  sourceNote String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  service Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  variant ServiceVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  requestRequirements RequestDocumentRequirement[]
+
+  @@index([serviceId])
+  @@index([variantId])
+}
+
+// نسخة مستقلة من متطلبات المستندات لكل طلب
+model RequestDocumentRequirement {
+  id              String    @id @default(cuid())
+  requestId       String
+  requirementId   String?
+  requirementCode String?
+  title           String
+  details         String?
+  condition       String?
+  isRequired      Boolean   @default(true)
+  status          String    @default("NOT_RECEIVED")
+  notes           String?
+  filePath        String?
+  receivedAt      DateTime?
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  requirement ServiceDocumentRequirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([requirementId])
+}
+
+========== lib/auth.ts ==========
+
+import "server-only";
+import { SignJWT, jwtVerify } from "jose";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { prisma } from "./prisma";
+
+const COOKIE_NAME = "masar_session";
+const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
+
+if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 32) {
+  throw new Error("AUTH_SECRET must be at least 32 characters");
+}
+
+type SessionUser = {
+  id: string;
+  role: string;
+  departmentId: string | null;
+};
+
+export async function createSession(user: SessionUser) {
+  const token = await new SignJWT({
+    role: user.role,
+    departmentId: user.departmentId,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(user.id)
+    .setIssuedAt()
+    .setExpirationTime("8h")
+    .sign(secret);
+
+  const cookieStore = await cookies();
+
+  cookieStore.set(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 8,
+  });
+}
+
+export async function deleteSession() {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAME);
+}
+
+export async function getCurrentUser() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+
+  if (!token) return null;
+
+  try {
+    const { payload } = await jwtVerify(token, secret);
+
+    if (!payload.sub) return null;
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        departmentId: true,
+        isActive: true,
+        department: {
+          select: { name: true },
+        },
+      },
+    });
+
+    if (!user || !user.isActive) return null;
+
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+export async function requireUser() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  return user;
+}
+
+========== lib/permissions.ts ==========
+
+import "server-only";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "./auth";
+
+export const ROLES = {
+  GENERAL_MANAGER: "GENERAL_MANAGER",
+  DEPARTMENT_MANAGER: "DEPARTMENT_MANAGER",
+  EMPLOYEE: "EMPLOYEE",
+} as const;
+
+export async function requireRole(allowedRoles: string[]) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (!allowedRoles.includes(user.role)) {
+    redirect("/unauthorized");
+  }
+
+  return user;
+}
+
+export async function requireGeneralManager() {
+  return requireRole([ROLES.GENERAL_MANAGER]);
+}
+
+export async function requireDepartmentManager() {
+  return requireRole([
+    ROLES.GENERAL_MANAGER,
+    ROLES.DEPARTMENT_MANAGER,
+  ]);
+}
+
+export async function requireEmployee() {
+  return requireRole([
+    ROLES.GENERAL_MANAGER,
+    ROLES.DEPARTMENT_MANAGER,
+    ROLES.EMPLOYEE,
+  ]);
+}
+
+export async function canAccessDepartment(departmentId: string) {
+  const user = await getCurrentUser();
+
+  if (!user) return false;
+
+  if (user.role === ROLES.GENERAL_MANAGER) return true;
+
+  return user.departmentId === departmentId;
+}
+
+========== app/api/auth/login/route.ts ==========
+
+import { NextResponse } from "next/server";
+import { compare } from "bcryptjs";
+import { prisma } from "@/lib/prisma";
+import { createSession } from "@/lib/auth";
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+
+    const email =
+      typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+
+    const password =
+      typeof body.password === "string" ? body.password : "";
+
+    if (!email || !password) {
+      return NextResponse.json(
+        { message: "أدخل البريد الإلكتروني وكلمة المرور" },
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user || !user.isActive) {
+      return NextResponse.json(
+        { message: "بيانات الدخول غير صحيحة" },
+        { status: 401 }
+      );
+    }
+
+    const passwordIsValid = await compare(
+      password,
+      user.passwordHash
+    );
+
+    if (!passwordIsValid) {
+      return NextResponse.json(
+        { message: "بيانات الدخول غير صحيحة" },
+        { status: 401 }
+      );
+    }
+
+    await createSession({
+      id: user.id,
+      role: user.role,
+      departmentId: user.departmentId,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "تم تسجيل الدخول بنجاح",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        departmentId: user.departmentId,
+      },
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+
+    return NextResponse.json(
+      { message: "حدث خطأ أثناء تسجيل الدخول" },
+      { status: 500 }
+    );
+  }
+}
+
+========== app/api/auth/logout/route.ts ==========
+
+import { NextResponse } from "next/server";
+import { deleteSession } from "@/lib/auth";
+
+export async function POST() {
+  await deleteSession();
+
+  return NextResponse.json({
+    success: true,
+    message: "تم تسجيل الخروج",
+  });
+}
+
+========== app/login/page.tsx ==========
+
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+export default function LoginPage() {
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || "تعذر تسجيل الدخول");
+        return;
+      }
+
+      router.replace("/");
+      router.refresh();
+    } catch {
+      setError("تعذر الاتصال بالخادم. حاول مرة أخرى.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main
+      dir="rtl"
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#f3f5f9",
+        padding: "24px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+          background: "#fff",
+          padding: "36px",
+          borderRadius: "16px",
+          boxShadow: "0 8px 35px rgba(0,0,0,0.08)",
+        }}
+      >
+        <div style={{ textAlign: "center", marginBottom: "30px" }}>
+          <h1 style={{ color: "#183153", marginBottom: "10px" }}>
+            خاطر اللواج
+          </h1>
+
+          <p style={{ color: "#64748b", margin: 0 }}>
+            تسجيل الدخول إلى نظام إدارة الطلبات
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <label
+            htmlFor="email"
+            style={{ display: "block", marginBottom: "8px" }}
+          >
+            البريد الإلكتروني
+          </label>
+
+          <input
+            id="email"
+            type="email"
+            required
+            autoComplete="username"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="أدخل البريد الإلكتروني"
+            style={{
+              width: "100%",
+              padding: "13px",
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              marginBottom: "20px",
+              boxSizing: "border-box",
+            }}
+          />
+
+          <label
+            htmlFor="password"
+            style={{ display: "block", marginBottom: "8px" }}
+          >
+            كلمة المرور
+          </label>
+
+          <input
+            id="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="أدخل كلمة المرور"
+            style={{
+              width: "100%",
+              padding: "13px",
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              marginBottom: "18px",
+              boxSizing: "border-box",
+            }}
+          />
+
+          {error && (
+            <p
+              role="alert"
+              style={{
+                color: "#b91c1c",
+                background: "#fef2f2",
+                padding: "10px",
+                borderRadius: "8px",
+                fontSize: "14px",
+              }}
+            >
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: "100%",
+              padding: "14px",
+              border: "none",
+              borderRadius: "8px",
+              background: loading ? "#64748b" : "#183153",
+              color: "#fff",
+              fontSize: "16px",
+              cursor: loading ? "wait" : "pointer",
+            }}
+          >
+            {loading ? "جاري تسجيل الدخول..." : "تسجيل الدخول"}
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
+
+========== components/RequestRegistration.tsx ==========
+
+"use client";
+
+import { useState } from "react";
+
+type CustomerDocument = {
+  id: string;
+  documentType: string;
+  documentNumber: string | null;
+  issueDate: string | null;
+  expiryDate: string | null;
+  filePath: string | null;
+  notes: string | null;
+};
+
+type Customer = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  taxNumber: string | null;
+  notes: string | null;
+  documents: CustomerDocument[];
+};
+
+const documentTypes = [
+  "البطاقة الضريبية",
+  "شهادة التسجيل في ضريبة القيمة المضافة",
+  "سجل تجاري",
+  "بطاقة استيرادية",
+  "بطاقة تصديرية",
+  "رخصة إنشاءات",
+  "توكيل",
+  "مستند آخر",
+];
+
+export default function RequestRegistration() {
+  const [customerType, setCustomerType] = useState<"new" | "existing">("new");
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState("");
+
+  const [customer, setCustomer] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    address: "",
+    taxNumber: "",
+    notes: "",
+  });
+
+  const [request, setRequest] = useState({
+    serviceName: "",
+    description: "",
+    priority: "NORMAL",
+    receivedAt: new Date().toISOString().slice(0, 10),
+  });
+
+  const [documents, setDocuments] = useState<
+    { documentType: string; documentNumber: string; expiryDate: string }[]
+  >([]);
+
+  async function searchCustomers(value: string) {
+    setSearch(value);
+    setSelectedCustomer(null);
+    setError("");
+
+    if (value.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+
+    setSearching(true);
+
+    try {
+      const response = await fetch(
+        `/api/customers/search?q=${encodeURIComponent(value.trim())}`
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || "تعذر البحث عن العملاء");
+        setResults([]);
+        return;
+      }
+
+      setResults(data.customers || []);
+    } catch {
+      setError("حدث خطأ أثناء الاتصال بقاعدة البيانات");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function chooseCustomer(item: Customer) {
+    setSelectedCustomer(item);
+    setSearch(item.name);
+    setResults([]);
+
+    setCustomer({
+      name: item.name,
+      phone: item.phone || "",
+      email: item.email || "",
+      address: item.address || "",
+      taxNumber: item.taxNumber || "",
+      notes: item.notes || "",
+    });
+  }
+
+  function updateCustomer(field: string, value: string) {
+    setCustomer((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateRequest(field: string, value: string) {
+    setRequest((current) => ({ ...current, [field]: value }));
+  }
+
+  function addDocument() {
+    setDocuments((current) => [
+      ...current,
+      { documentType: "", documentNumber: "", expiryDate: "" },
+    ]);
+  }
+
+  function updateDocument(
+    index: number,
+    field: string,
+    value: string
+  ) {
+    setDocuments((current) =>
+      current.map((document, i) =>
+        i === index ? { ...document, [field]: value } : document
+      )
+    );
+  }
+
+  return (
+    <div className="form-card">
+      <h2>بيانات العميل</h2>
+      <p>حدد إذا كانت الشركة تتعامل معنا لأول مرة أم لديها ملف سابق.</p>
+
+      <div className="form-grid">
+        <div className="form-field">
+          <label>نوع العميل</label>
+          <select
+            value={customerType}
+            onChange={(e) => {
+              const value = e.target.value as "new" | "existing";
+              setCustomerType(value);
+              setSelectedCustomer(null);
+              setSearch("");
+              setResults([]);
+              setError("");
+              setCustomer({
+                name: "",
+                phone: "",
+                email: "",
+                address: "",
+                taxNumber: "",
+                notes: "",
+              });
+            }}
+          >
+            <option value="new">عميل جديد</option>
+            <option value="existing">عميل حالي</option>
+          </select>
+        </div>
+
+        {customerType === "existing" && (
+          <div className="form-field">
+            <label htmlFor="customerSearch">
+              ابحث باسم الشركة أو رقم الهاتف أو الرقم الضريبي
+            </label>
+            <input
+              id="customerSearch"
+              value={search}
+              onChange={(e) => searchCustomers(e.target.value)}
+              placeholder="اكتب اسم الشركة أو رقم الهاتف..."
+            />
+
+            {searching && <p>جاري البحث...</p>}
+
+            {results.length > 0 && (
+              <div className="customer-search-results">
+                {results.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => chooseCustomer(item)}
+                    className="customer-result"
+                  >
+                    <strong>{item.name}</strong>
+                    <span>
+                      {item.taxNumber || "لا يوجد رقم ضريبي"} —{" "}
+                      {item.phone || "لا يوجد هاتف"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {search.trim().length >= 2 &&
+              !searching &&
+              results.length === 0 &&
+              !selectedCustomer && (
+                <p>لم يتم العثور على عميل مطابق.</p>
+              )}
+          </div>
+        )}
+      </div>
+
+      {selectedCustomer && (
+        <div className="form-card" style={{ marginTop: 20 }}>
+          <h3>ملف العميل المحفوظ</h3>
+          <p>
+            تم تحميل بيانات الشركة من قاعدة البيانات. يمكنك تعديل البيانات
+            قبل حفظ الطلب.
+          </p>
+
+          <div className="form-grid">
+            {[
+              ["name", "اسم الشركة"],
+              ["phone", "رقم الهاتف"],
+              ["email", "البريد الإلكتروني"],
+              ["address", "العنوان"],
+              ["taxNumber", "الرقم الضريبي"],
+            ].map(([field, label]) => (
+              <div className="form-field" key={field}>
+                <label>{label}</label>
+                <input
+                  value={customer[field as keyof typeof customer]}
+                  onChange={(e) => updateCustomer(field, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+
+          <h3 style={{ marginTop: 24 }}>المستندات المسجلة للشركة</h3>
+
+          {selectedCustomer.documents.length === 0 ? (
+            <p>لا توجد مستندات محفوظة لهذا العميل حتى الآن.</p>
+          ) : (
+            <div className="form-grid">
+              {selectedCustomer.documents.map((document) => (
+                <div className="form-field" key={document.id}>
+                  <strong>{document.documentType}</strong>
+                  <span>
+                    رقم المستند: {document.documentNumber || "غير مسجل"}
+                  </span>
+                  <span>
+                    تاريخ الانتهاء:{" "}
+                    {document.expiryDate
+                      ? new Date(document.expiryDate).toLocaleDateString("ar-EG")
+                      : "غير محدد"}
+                  </span>
+                  {document.filePath && (
+                    <a href={document.filePath} target="_blank" rel="noreferrer">
+                      فتح الملف المحفوظ
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {(customerType === "new" || selectedCustomer) && (
+        <>
+          <h3 style={{ marginTop: 24 }}>
+            {customerType === "new" ? "بيانات الشركة الجديدة" : "تعديل بيانات الشركة"}
+          </h3>
+
+          <div className="form-grid">
+            {[
+              ["name", "اسم الشركة"],
+              ["phone", "رقم الهاتف"],
+              ["email", "البريد الإلكتروني"],
+              ["address", "العنوان"],
+              ["taxNumber", "الرقم الضريبي"],
+            ].map(([field, label]) => (
+              <div className="form-field" key={field}>
+                <label>{label}</label>
+                <input
+                  required={field === "name"}
+                  value={customer[field as keyof typeof customer]}
+                  onChange={(e) => updateCustomer(field, e.target.value)}
+                  placeholder={`أدخل ${label}`}
+                />
+              </div>
+            ))}
+
+            <div className="form-field full-width">
+              <label>ملاحظات عن العميل</label>
+              <textarea
+                rows={3}
+                value={customer.notes}
+                onChange={(e) => updateCustomer("notes", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <h3 style={{ marginTop: 24 }}>إضافة مستندات للعميل</h3>
+
+          {documents.map((document, index) => (
+            <div className="form-grid" key={index}>
+              <div className="form-field">
+                <label>نوع المستند</label>
+                <select
+                  value={document.documentType}
+                  onChange={(e) =>
+                    updateDocument(index, "documentType", e.target.value)
+                  }
+                >
+                  <option value="">اختر نوع المستند</option>
+                  {documentTypes.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label>رقم المستند</label>
+                <input
+                  value={document.documentNumber}
+                  onChange={(e) =>
+                    updateDocument(index, "documentNumber", e.target.value)
+                  }
+                />
+              </div>
+
+              <div className="form-field">
+                <label>تاريخ الانتهاء</label>
+                <input
+                  type="date"
+                  value={document.expiryDate}
+                  onChange={(e) =>
+                    updateDocument(index, "expiryDate", e.target.value)
+                  }
+                />
+              </div>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={addDocument}
+          >
+            + إضافة مستند
+          </button>
+        </>
+      )}
+
+      <hr style={{ margin: "28px 0" }} />
+
+      <h2>بيانات الطلب الجديد</h2>
+
+      <div className="form-grid">
+        <div className="form-field">
+          <label>الخدمة المطلوبة</label>
+          <input
+            value={request.serviceName}
+            onChange={(e) => updateRequest("serviceName", e.target.value)}
+            placeholder="اكتب الخدمة المطلوبة"
+          />
+        </div>
+
+        <div className="form-field">
+          <label>تاريخ استلام الطلب</label>
+          <input
+            type="date"
+            value={request.receivedAt}
+            onChange={(e) => updateRequest("receivedAt", e.target.value)}
+          />
+        </div>
+
+        <div className="form-field">
+          <label>الأولوية</label>
+          <select
+            value={request.priority}
+            onChange={(e) => updateRequest("priority", e.target.value)}
+          >
+            <option value="NORMAL">عادي</option>
+            <option value="MEDIUM">متوسط</option>
+            <option value="URGENT">عاجل</option>
+          </select>
+        </div>
+
+        <div className="form-field full-width">
+          <label>وصف الطلب</label>
+          <textarea
+            rows={4}
+            value={request.description}
+            onChange={(e) => updateRequest("description", e.target.value)}
+          />
+        </div>
+      </div>
+
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      <p style={{ marginTop: 20, color: "#64748b" }}>
+        تم تجهيز البحث وعرض ملف العميل. الخطوة التالية هي ربط زر الحفظ
+        بقاعدة البيانات ورفع ملفات المستندات فعليًا.
+      </p>
+    </div>
+  );
+}
+
+========== app/globals.css ==========
+
+/* إعدادات عامة */
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --navy: #123b5d;
+  --blue: #1e5b85;
+  --blue-light: #eaf3f9;
+  --background: #f3f6fa;
+  --text: #26384b;
+  --muted: #718096;
+  --border: #e1e8ef;
+  --white: #ffffff;
+}
+
+html {
+  direction: rtl;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: Tahoma, Arial, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* التخطيط الرئيسي */
+.workflow-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* القائمة الجانبية */
+.sidebar {
+  width: 255px;
+  min-width: 255px;
+  min-height: 100vh;
+  background: var(--navy);
+  color: white;
+  padding: 28px 16px;
+  box-shadow: -3px 0 15px #0000000d;
+}
+
+.sidebar h2 {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 22px;
+  font-weight: bold;
+}
+
+.sidebar > p {
+  color: #c8d9e7;
+  font-size: 13px;
+  padding: 0 10px 22px;
+  margin: 8px 0 20px;
+  border-bottom: 1px solid #ffffff26;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.nav-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #e7f0f7;
+  text-align: right;
+  padding: 13px 15px;
+  border-radius: 9px;
+  font-size: 14px;
+  transition: 0.2s ease;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background: #1e5b85;
+  color: white;
+  transform: translateX(-2px);
+}
+
+/* المحتوى الرئيسي */
+.main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 32px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.page-heading {
+  background: white;
+  padding: 25px 28px;
+  border-radius: 14px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 3px 14px #00000008;
+}
+
+.page-heading h1 {
+  color: var(--navy);
+  font-size: 27px;
+  margin: 8px 0;
+}
+
+.page-heading p {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
+  line-height: 1.8;
+}
+
+.eyebrow {
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* الأزرار */
+.primary-button,
+.secondary-button {
+  border: none;
+  border-radius: 9px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: bold;
+  transition: 0.2s ease;
+}
+
+.primary-button {
+  background: var(--blue);
+  color: white;
+}
+
+.primary-button:hover {
+  background: var(--navy);
+  transform: translateY(-1px);
+}
+
+.secondary-button {
+  background: var(--blue-light);
+  color: var(--navy);
+}
+
+.secondary-button:hover {
+  background: #dcebf5;
+}
+
+/* إحصائيات لوحة التحكم */
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background: white;
+  padding: 23px;
+  border-radius: 13px;
+  box-shadow: 0 3px 12px #00000008;
+  border: 1px solid #edf1f5;
+}
+
+.stat-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.stat-card strong {
+  display: block;
+  color: var(--navy);
+  font-size: 25px;
+  margin-top: 13px;
+}
+
+/* عنوان الأقسام */
+.section-heading {
+  margin: 28px 0 17px;
+}
+
+.section-heading h2 {
+  color: var(--navy);
+  font-size: 21px;
+  margin: 0 0 8px;
+}
+
+.section-heading p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+/* بطاقات مراحل العمل */
+.stage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 17px;
+}
+
+.stage-card {
+  position: relative;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 22px;
+  text-align: right;
+  min-height: 175px;
+  transition: 0.2s ease;
+  box-shadow: 0 2px 10px #00000005;
+}
+
+.stage-card:hover {
+  border-color: #8eb6d1;
+  box-shadow: 0 7px 20px #123b5d12;
+  transform: translateY(-3px);
+}
+
+.stage-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: white;
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 14px;
+}
+
+.stage-card h3 {
+  color: var(--navy);
+  font-size: 16px;
+  margin: 0 0 9px;
+}
+
+.stage-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+  margin: 0 0 15px;
+}
+
+.stage-link {
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* شريط تقدم المرحلة */
+.progress-track {
+  width: 100%;
+  height: 9px;
+  background: #e2eaf0;
+  border-radius: 20px;
+  overflow: hidden;
+  margin: 0 0 25px;
+}
+
+.progress-value {
+  height: 100%;
+  background: var(--blue);
+  border-radius: 20px;
+  transition: width 0.3s ease;
+}
+
+/* بطاقة النموذج */
+.form-card {
+  background: white;
+  padding: 28px;
+  border-radius: 14px;
+  box-shadow: 0 3px 14px #00000008;
+  border: 1px solid #edf1f5;
+}
+
+.form-card h2 {
+  color: var(--navy);
+  font-size: 20px;
+  margin: 0 0 25px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* حقول النموذج */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 21px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+
+.form-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-field label {
+  color: #334155;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  width: 100%;
+  min-height: 45px;
+  border: 1px solid #d7e0e9;
+  background: #fbfdff;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  outline: none;
+  transition: 0.2s;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px #1e5b8512;
+  background: white;
+}
+
+.form-field textarea {
+  min-height: 115px;
+  resize: vertical;
+  line-height: 1.8;
+}
+
+/* أزرار الحفظ والتنقل */
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin-top: 27px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.saved-message {
+  color: #16804a;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.navigation-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+/* الشاشات الصغيرة */
+@media (max-width: 1100px) {
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .main-content {
+    padding: 22px;
+  }
+
+  .stage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 750px) {
+  .workflow-layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+    min-height: auto;
+    padding: 17px;
+  }
+
+  .sidebar > p {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+  }
+
+  .sidebar nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .nav-item {
+    font-size: 12px;
+    padding: 11px 9px;
+  }
+
+  .main-content {
+    padding: 16px;
+  }
+
+  .page-heading {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 20px;
+  }
+
+  .page-heading h1 {
+    font-size: 23px;
+  }
+
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-field.full-width {
+    grid-column: auto;
+  }
+
+  .form-card {
+    padding: 19px;
+  }
+
+  .navigation-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .navigation-actions button {
+    width: 100%;
+  }
+}
+
+========== app/layout.tsx ==========
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "نظام متابعة الإجراءات",
+  description: "Khater El-Louaj Workflow Management",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="ar" dir="rtl">
+      <body>{children}</body>
+    </html>
+  );
+}

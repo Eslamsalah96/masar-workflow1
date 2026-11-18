@@ -1,0 +1,667 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ==========================================
+// الأقسام
+// ==========================================
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  users              User[]
+  requests           Request[]           @relation("CurrentDepartment")
+  tasks              WorkflowTask[]
+  taskTypes          TaskType[]
+  procedureTemplates ProcedureTemplate[]
+  incomingTransfers  RequestTransfer[]   @relation("ToDepartment")
+  outgoingTransfers  RequestTransfer[]   @relation("FromDepartment")
+
+  dailyTasks DailyTask[]
+}
+
+// ==========================================
+// الموظفون والمديرون
+// ==========================================
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String
+  departmentId String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  department      Department?       @relation(fields: [departmentId], references: [id])
+  createdRequests Request[]         @relation("RequestCreator")
+  assignedTasks   WorkflowTask[]    @relation("TaskAssignee")
+  createdTasks    WorkflowTask[]    @relation("TaskAssigner")
+  transfers       RequestTransfer[]
+  activities      ActivityLog[]
+  expenses        Expense[]
+  notifications   Notification[]
+
+  requestReviews RequestReview[] @relation("RequestReviewReviewer")
+
+  workSessions       WorkSession[]
+  assignedDailyTasks DailyTask[]       @relation("DailyTaskAssignee")
+  createdDailyTasks  DailyTask[]       @relation("DailyTaskCreator")
+  dailyTaskExpenses  DailyTaskExpense[]
+  managerReviews     RequestManagerReview[] @relation("ManagerReviewReviewer")
+}
+
+// ==========================================
+// العملاء
+// ==========================================
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  taxNumber String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents CustomerDocument[]
+  requests  Request[]
+  dailyTasks DailyTask[]
+}
+
+// ==========================================
+// مستندات وبيانات العميل
+// ==========================================
+
+model CustomerDocument {
+  id             String    @id @default(cuid())
+  customerId     String
+  documentType   String
+  documentNumber String?
+  issueDate      DateTime?
+  expiryDate     DateTime?
+  filePath       String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// الطلبات
+// ==========================================
+
+model Request {
+  id                  String  @id @default(cuid())
+  requestNumber       String  @unique
+  customerId          String
+  createdById         String
+  currentDepartmentId String?
+
+  // بيانات الخدمة
+  serviceName      String
+  serviceId        String?
+  serviceVariantId String?
+
+  // بيانات العميل والشركة
+  customerType              String  @default("NEW")
+  proposedCompanyName       String?
+  companyAlreadyEstablished Boolean @default(false)
+
+  // متابعة مراجعة مدير الإجراءات
+  submittedAt      DateTime?
+  serviceStartedAt DateTime?
+  deadlineAt       DateTime?
+
+  description String?
+  priority    String    @default("NORMAL")
+  status      String    @default("NEW")
+  receivedAt  DateTime  @default(now())
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  customer          Customer    @relation(fields: [customerId], references: [id])
+  createdBy         User        @relation("RequestCreator", fields: [createdById], references: [id])
+  currentDepartment Department? @relation("CurrentDepartment", fields: [currentDepartmentId], references: [id])
+
+  // علاقات الخدمة
+  service        Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  serviceVariant ServiceVariant? @relation(fields: [serviceVariantId], references: [id], onDelete: SetNull)
+
+  // علاقات الطلب
+  attachments          RequestAttachment[]
+  tasks                WorkflowTask[]
+  transfers            RequestTransfer[]
+  activities           ActivityLog[]
+  expenses             Expense[]
+  documentRequirements RequestDocumentRequirement[]
+
+  reviews         RequestReview[]
+  questionAnswers RequestQuestionAnswer[]
+
+  managerReviews RequestManagerReview[]
+
+  @@index([serviceId])
+  @@index([serviceVariantId])
+  @@index([customerId])
+  @@index([requestNumber])
+}
+
+// ==========================================
+// مرفقات الطلب
+// ==========================================
+
+model RequestAttachment {
+  id        String   @id @default(cuid())
+  requestId String
+  fileName  String
+  filePath  String
+  createdAt DateTime @default(now())
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// سجل تحويل الطلبات بين الأقسام
+// ==========================================
+
+model RequestTransfer {
+  id               String   @id @default(cuid())
+  requestId        String
+  fromDepartmentId String?
+  toDepartmentId   String
+  transferredById  String
+  notes            String?
+  transferredAt    DateTime @default(now())
+
+  request        Request     @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fromDepartment Department? @relation("FromDepartment", fields: [fromDepartmentId], references: [id])
+  toDepartment   Department  @relation("ToDepartment", fields: [toDepartmentId], references: [id])
+  transferredBy  User        @relation(fields: [transferredById], references: [id])
+}
+
+// ==========================================
+// أنواع المهام
+// ==========================================
+
+model TaskType {
+  id                  String  @id @default(cuid())
+  name                String
+  departmentId        String
+  procedureTemplateId String?
+  isActive            Boolean @default(true)
+
+  department        Department         @relation(fields: [departmentId], references: [id])
+  procedureTemplate ProcedureTemplate? @relation(fields: [procedureTemplateId], references: [id])
+  tasks             WorkflowTask[]
+
+  @@unique([name, departmentId])
+}
+
+// ==========================================
+// قوالب الإجراءات وخطواتها
+// ==========================================
+
+model ProcedureTemplate {
+  id           String  @id @default(cuid())
+  name         String
+  departmentId String
+  description  String?
+  isActive     Boolean @default(true)
+
+  department Department              @relation(fields: [departmentId], references: [id])
+  steps      ProcedureStepTemplate[]
+  taskTypes  TaskType[]
+  tasks      WorkflowTask[]
+}
+
+model ProcedureStepTemplate {
+  id                  String  @id @default(cuid())
+  procedureTemplateId String
+  title               String
+  description         String?
+  order               Int
+
+  procedureTemplate ProcedureTemplate @relation(fields: [procedureTemplateId], references: [id], onDelete: Cascade)
+  taskSteps         TaskStep[]
+}
+
+// ==========================================
+// المهام الموزعة على الموظفين
+// ==========================================
+
+model WorkflowTask {
+  id                  String    @id @default(cuid())
+  requestId           String
+  departmentId        String
+  taskTypeId          String
+  procedureTemplateId String?
+  assignedToId        String?
+  assignedById        String
+  title               String
+  instructions        String?
+  status              String    @default("PENDING")
+  startedAt           DateTime?
+  expectedEndAt       DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  request           Request            @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  department        Department         @relation(fields: [departmentId], references: [id])
+  taskType          TaskType           @relation(fields: [taskTypeId], references: [id])
+  procedureTemplate ProcedureTemplate? @relation(fields: [procedureTemplateId], references: [id])
+  assignedTo        User?              @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  assignedBy        User               @relation("TaskAssigner", fields: [assignedById], references: [id])
+
+  steps       TaskStep[]
+  attachments TaskAttachment[]
+  expenses    Expense[]
+  activities  ActivityLog[]
+
+  workSessions WorkSession[]
+}
+
+// ==========================================
+// خطوات تنفيذ المهمة
+// ==========================================
+
+model TaskStep {
+  id             String    @id @default(cuid())
+  taskId         String
+  templateStepId String?
+  title          String
+  notes          String?
+  status         String    @default("PENDING")
+  completedAt    DateTime?
+  order          Int
+
+  task         WorkflowTask           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  templateStep ProcedureStepTemplate? @relation(fields: [templateStepId], references: [id])
+}
+
+// ==========================================
+// مرفقات تنفيذ المهمة
+// ==========================================
+
+model TaskAttachment {
+  id        String   @id @default(cuid())
+  taskId    String
+  fileName  String
+  filePath  String
+  createdAt DateTime @default(now())
+
+  task WorkflowTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// المصروفات
+// ==========================================
+
+model Expense {
+  id          String   @id @default(cuid())
+  requestId   String
+  taskId      String?
+  employeeId  String
+  amount      Float
+  description String
+  createdAt   DateTime @default(now())
+
+  request  Request       @relation(fields: [requestId], references: [id])
+  task     WorkflowTask? @relation(fields: [taskId], references: [id])
+  employee User          @relation(fields: [employeeId], references: [id])
+}
+
+// ==========================================
+// سجل الأحداث والتعديلات
+// ==========================================
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  requestId String?
+  taskId    String?
+  userId    String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  request Request?      @relation(fields: [requestId], references: [id])
+  task    WorkflowTask? @relation(fields: [taskId], references: [id])
+  user    User          @relation(fields: [userId], references: [id])
+}
+
+// ==========================================
+// الإشعارات
+// ==========================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// دليل خدمات GAFI
+// ==========================================
+
+// تصنيفات الخدمات
+model ServiceCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  services Service[]
+}
+
+// الخدمات
+model Service {
+  id          String   @id @default(cuid())
+  categoryId  String
+  name        String
+  slug        String   @unique
+  description String?
+  sourceName  String?
+  sourcePage  Int?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category             ServiceCategory              @relation(fields: [categoryId], references: [id])
+  variants             ServiceVariant[]
+  documentRequirements ServiceDocumentRequirement[]
+  requests             Request[]
+  questions            ServiceQuestion[]
+
+  @@index([categoryId])
+}
+
+// أنواع أو أشكال الخدمة
+model ServiceVariant {
+  id          String   @id @default(cuid())
+  serviceId   String
+  name        String
+  slug        String
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  documentRequirements ServiceDocumentRequirement[]
+  requests             Request[]
+
+  @@unique([serviceId, slug])
+  @@index([serviceId])
+}
+
+// المستندات المطلوبة لكل خدمة أو نوع خدمة
+model ServiceDocumentRequirement {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  serviceId  String
+  variantId  String?
+  title      String
+  details    String?
+  condition  String?
+  isRequired Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  sourcePage Int?
+  sourceNote String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  applicability String @default("ALL")
+
+  service  Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  variant  ServiceVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  kind     String          @default("DOCUMENT")
+  isActive Boolean         @default(true)
+
+  conditions          ServiceRequirementCondition[]
+  requestRequirements RequestDocumentRequirement[]
+
+  @@index([serviceId])
+  @@index([variantId])
+}
+
+// نسخة مستقلة من متطلبات المستندات لكل طلب
+model RequestDocumentRequirement {
+  id              String    @id @default(cuid())
+  requestId       String
+  requirementId   String?
+  requirementCode String?
+  title           String
+  details         String?
+  condition       String?
+  isRequired      Boolean   @default(true)
+  status          String    @default("NOT_RECEIVED")
+  notes           String?
+  value           String?
+  filePath        String?
+  receivedAt      DateTime?
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  request     Request                     @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  kind        String                      @default("DOCUMENT")
+  requirement ServiceDocumentRequirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+
+  applicability String  @default("ALL")
+  fileName      String?
+  fileMimeType  String?
+  fileSize      Int?
+
+  @@index([requestId])
+  @@index([requirementId])
+}
+
+model RequestReview {
+  id                  String    @id @default(cuid())
+  requestId           String
+  reviewerId          String
+  action              String
+  feedback            String?
+  startedAt           DateTime?
+  reviewedAt          DateTime  @default(now())
+  activeReviewSeconds Int?
+
+  request  Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  reviewer User    @relation("RequestReviewReviewer", fields: [reviewerId], references: [id])
+
+  @@index([requestId])
+  @@index([reviewerId])
+  @@index([reviewedAt])
+}
+
+// ==========================================
+// أسئلة تحديد شروط الخدمة والمستندات
+// ==========================================
+
+model ServiceQuestion {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  serviceId   String
+  label       String
+  description String?
+  type        String   @default("YES_NO")
+  optionsJson String?
+  isRequired  Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  sourcePage  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  service    Service                       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  conditions ServiceRequirementCondition[]
+  answers    RequestQuestionAnswer[]
+
+  @@index([serviceId])
+}
+
+// ==========================================
+// شروط ظهور المستندات
+// ==========================================
+
+model ServiceRequirementCondition {
+  id            String @id @default(cuid())
+  requirementId String
+  questionId    String
+  expectedValue String
+  groupKey      String @default("DEFAULT")
+
+  requirement ServiceDocumentRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  question    ServiceQuestion            @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([requirementId, questionId, expectedValue, groupKey])
+  @@index([requirementId])
+  @@index([questionId])
+}
+
+// ==========================================
+// نسخة إجابات الأسئلة داخل الطلب
+// ==========================================
+
+model RequestQuestionAnswer {
+  id            String   @id @default(cuid())
+  requestId     String
+  questionId    String?
+  questionCode  String
+  questionLabel String
+  answer        String
+  createdAt     DateTime @default(now())
+
+  request  Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  question ServiceQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([questionId])
+}
+
+// ==========================================
+// مراجعة مدير القسم للطلبات قبل توزيع المهام
+// ==========================================
+
+model RequestManagerReview {
+  id         String    @id @default(cuid())
+  requestId  String
+  reviewerId String
+  action     String    @default("PENDING")
+  feedback   String?
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+
+  request  Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  reviewer User    @relation("ManagerReviewReviewer", fields: [reviewerId], references: [id])
+
+  @@index([requestId])
+  @@index([reviewerId])
+  @@index([action])
+}
+
+// ==========================================
+// المهام اليومية السريعة والمهام الداخلية
+// ==========================================
+
+model DailyTask {
+  id           String    @id @default(cuid())
+  title        String
+  taskType     String    @default("QUICK_SERVICE")
+  serviceName  String?
+  customerId   String?
+  customerName String?
+  companyName  String?
+  departmentId String
+  assignedToId String?
+  createdById  String
+  description  String?
+  status       String    @default("PENDING")
+  deadlineAt   DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  customer   Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  department Department @relation(fields: [departmentId], references: [id])
+  assignedTo User?      @relation("DailyTaskAssignee", fields: [assignedToId], references: [id])
+  createdBy  User       @relation("DailyTaskCreator", fields: [createdById], references: [id])
+
+  workSessions WorkSession[]
+  expenses     DailyTaskExpense[]
+
+  @@index([departmentId])
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ==========================================
+// جلسات بدء وإيقاف العمل
+// ==========================================
+
+model WorkSession {
+  id              String    @id @default(cuid())
+  workflowTaskId  String?
+  dailyTaskId     String?
+  userId          String
+  startedAt       DateTime  @default(now())
+  stoppedAt       DateTime?
+  durationSeconds Int?
+  createdAt       DateTime  @default(now())
+
+  workflowTask WorkflowTask? @relation(fields: [workflowTaskId], references: [id], onDelete: Cascade)
+  dailyTask    DailyTask?    @relation(fields: [dailyTaskId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id])
+
+  @@index([workflowTaskId])
+  @@index([dailyTaskId])
+  @@index([userId])
+  @@index([stoppedAt])
+}
+
+// ==========================================
+// مصروفات المهام اليومية
+// ==========================================
+
+model DailyTaskExpense {
+  id          String   @id @default(cuid())
+  dailyTaskId String
+  employeeId  String
+  amount      Float
+  description String
+  createdAt   DateTime @default(now())
+
+  dailyTask DailyTask @relation(fields: [dailyTaskId], references: [id], onDelete: Cascade)
+  employee  User      @relation(fields: [employeeId], references: [id])
+
+  @@index([dailyTaskId])
+  @@index([employeeId])
+  @@index([createdAt])
+}
